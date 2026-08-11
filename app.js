@@ -339,11 +339,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Mock Data Fallback ---
     function getMockData() {
         return [
-            { id: '1', title: 'The Mandalorian', type: 'series_season', release_year: 2019, franchise_id: 'f1', mock_franchise: 'Star Wars', chronological_order: 1, mock_service: 'disney', poster_url: 'https://via.placeholder.com/300x450/111111/fff?text=Mandalorian' },
-            { id: '2', title: 'The Book of Boba Fett', type: 'series_season', release_year: 2021, franchise_id: 'f1', mock_franchise: 'Star Wars', chronological_order: 2, mock_service: 'disney', poster_url: 'https://via.placeholder.com/300x450/111111/fff?text=Boba+Fett' },
-            { id: '3', title: 'Stranger Things', type: 'series_season', release_year: 2016, franchise_id: null, chronological_order: null, mock_service: 'netflix', poster_url: 'https://via.placeholder.com/300x450/111111/e50914?text=Stranger+Things' },
-            { id: '4', title: 'The Last of Us', type: 'series_season', release_year: 2023, franchise_id: null, chronological_order: null, mock_service: 'max', poster_url: 'https://via.placeholder.com/300x450/111111/fff?text=The+Last+of+Us' },
-            { id: '5', title: 'The Bear', type: 'series_season', release_year: 2022, franchise_id: null, chronological_order: null, mock_service: 'hulu', poster_url: 'https://via.placeholder.com/300x450/111111/00ed70?text=The+Bear' },
+            { id: '1', title: 'The Mandalorian', type: 'series_season', release_year: 2019, franchise_id: 'f1', mock_franchise: 'Star Wars', chronological_order: 1, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/eU1i6eHXlzMOlEq0ku1Rzq7Y4wA.jpg' },
+            { id: '2', title: 'The Book of Boba Fett', type: 'series_season', release_year: 2021, franchise_id: 'f1', mock_franchise: 'Star Wars', chronological_order: 2, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/gNbdjDi1OIRC24nmOblOXqlIQnv.jpg' },
+            { id: '3', title: 'Ahsoka', type: 'series_season', release_year: 2023, franchise_id: 'f1', mock_franchise: 'Star Wars', chronological_order: 3, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/q228tJmE6L20s5gLThc2zOqHj8q.jpg' },
+            { id: '4', title: 'Stranger Things', type: 'series_season', release_year: 2016, franchise_id: null, chronological_order: null, mock_service: 'netflix', poster_url: 'https://image.tmdb.org/t/p/w500/49WJfeN0moxb9IPfGn8SliM7O14.jpg' },
+            { id: '5', title: 'The Last of Us', type: 'series_season', release_year: 2023, franchise_id: null, chronological_order: null, mock_service: 'max', poster_url: 'https://image.tmdb.org/t/p/w500/uKvVjHNqB5VmOrdxqAt2F7J78ED.jpg' },
+            { id: '6', title: 'The Bear', type: 'series_season', release_year: 2022, franchise_id: null, chronological_order: null, mock_service: 'hulu', poster_url: 'https://image.tmdb.org/t/p/w500/sY6u6vPoyWkHqGg7V02GTV4B9pZ.jpg' },
+            { id: '7', title: 'WandaVision', type: 'series_season', release_year: 2021, franchise_id: 'f2', mock_franchise: 'Marvel', chronological_order: 1, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/glKDfE6btIRcVB5zrjspRIs4r52.jpg' },
+            { id: '8', title: 'Loki', type: 'series_season', release_year: 2021, franchise_id: 'f2', mock_franchise: 'Marvel', chronological_order: 2, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/kEl2t3OhXc3Zb9FBh1AuYzRTgZp.jpg' },
+            { id: '9', title: 'House of the Dragon', type: 'series_season', release_year: 2022, franchise_id: null, chronological_order: null, mock_service: 'max', poster_url: 'https://image.tmdb.org/t/p/w500/1X4h40fcBaqcg9cgEV13koOSNfl.jpg' },
+            { id: '10', title: 'The Boys', type: 'series_season', release_year: 2019, franchise_id: null, chronological_order: null, mock_service: 'prime', poster_url: 'https://image.tmdb.org/t/p/w500/7Ns6tOqsT7h2LqF21c2G4t9q30Z.jpg' },
+            { id: '11', title: 'Invincible', type: 'series_season', release_year: 2021, franchise_id: null, chronological_order: null, mock_service: 'prime', poster_url: 'https://image.tmdb.org/t/p/w500/y20p5ZpYngF2kUeA4JjG1W3tYIu.jpg' },
+            { id: '12', title: 'Shōgun', type: 'series_season', release_year: 2024, franchise_id: null, chronological_order: null, mock_service: 'hulu', poster_url: 'https://image.tmdb.org/t/p/w500/7O4iVfOMQmdCSxhOg1WNzG1AoQk.jpg' }
         ];
     }
 

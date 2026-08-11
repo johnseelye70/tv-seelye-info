@@ -9,17 +9,6 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="debug-error-box" style="display:none; background: #ff0000; color: white; padding: 20px; font-weight: bold; position: fixed; top: 0; left: 0; width: 100%; z-index: 9999;"></div>
-    <script>
-        window.addEventListener('error', function(e) {
-            document.getElementById('debug-error-box').style.display = 'block';
-            document.getElementById('debug-error-box').innerHTML += e.message + '<br>' + e.filename + ':' + e.lineno + '<br>';
-        });
-        window.addEventListener('unhandledrejection', function(e) {
-            document.getElementById('debug-error-box').style.display = 'block';
-            document.getElementById('debug-error-box').innerHTML += 'Unhandled Promise Rejection: ' + e.reason + '<br>';
-        });
-    </script>
     <header class="site-header">
         <div class="logo">
             <h1>Seelye TV Hub</h1>
@@ -62,6 +51,19 @@
             </div>
         </section>
     </main>
+
+    <footer class="site-footer">
+        <div class="version-info">
+            <strong>Version: Beta 0.2.0</strong>
+        </div>
+        <div class="changelog">
+            <h3>Version History</h3>
+            <ul>
+                <li><strong>Beta 0.2.0</strong> - Added in-app Sign Up functionality and improved database connection stability.</li>
+                <li><strong>Beta 0.1.0</strong> - Initial release. Deployed vanilla architecture, Supabase integration, and Chronological "Next Up" map.</li>
+            </ul>
+        </div>
+    </footer>
 
     <!-- Login Modal -->
     <div id="login-modal" class="modal hidden">

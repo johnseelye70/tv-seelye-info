@@ -353,3 +353,37 @@ a { color: var(--accent-color); text-decoration: none; }
     color: var(--text-muted);
     font-style: italic;
 }
+
+/* --- Footer & Changelog --- */
+.site-footer {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 2rem auto 0;
+    border-top: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+}
+
+.version-info {
+    margin-bottom: 1rem;
+    color: var(--text-main);
+}
+
+.changelog h3 {
+    font-size: 1.1rem;
+    color: var(--text-main);
+    margin-bottom: 0.5rem;
+}
+
+.changelog ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+.changelog li {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.changelog li strong {
+    color: var(--accent-color);
+}
