@@ -66,7 +66,7 @@
     <!-- Login Modal -->
     <div id="login-modal" class="modal hidden">
         <div class="modal-content">
-            <h2>Welcome Back</h2>
+            <h2 id="auth-modal-title">Welcome Back</h2>
             <form id="login-form">
                 <div class="input-group">
                     <label for="email">Email</label>
@@ -76,12 +76,16 @@
                     <label for="password">Password</label>
                     <input type="password" id="password" required>
                 </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn secondary-btn" id="close-login-btn">Cancel</button>
-                    <button type="submit" class="btn primary-btn">Login</button>
+                <div class="modal-actions" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <a href="#" id="toggle-auth-mode" style="font-size: 0.85rem; color: var(--accent-color);">Need an account? Sign up</a>
+                    <div style="display: flex; gap: 1rem;">
+                        <button type="button" class="btn secondary-btn" id="close-login-btn">Cancel</button>
+                        <button type="submit" class="btn primary-btn" id="auth-submit-btn">Login</button>
+                    </div>
                 </div>
             </form>
             <p id="login-error" class="error-msg"></p>
+            <p id="login-success" class="success-msg" style="color: var(--success-color); margin-top: 1rem; font-size: 0.9rem; display: none;"></p>
         </div>
     </div>
 

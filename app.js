@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let userWatchlist = [];
     let currentFilter = 'all';
     let searchQuery = '';
+    let isLoginMode = true;
 
     // DOM Elements
     const authBtn = document.getElementById('auth-btn');
@@ -15,6 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('login-form');
     const closeLoginBtn = document.getElementById('close-login-btn');
     const loginError = document.getElementById('login-error');
+    const loginSuccess = document.getElementById('login-success');
+    const authModalTitle = document.getElementById('auth-modal-title');
+    const authSubmitBtn = document.getElementById('auth-submit-btn');
+    const toggleAuthModeBtn = document.getElementById('toggle-auth-mode');
     const catalogGrid = document.getElementById('catalog-grid');
     const serviceFilters = document.getElementById('service-filters');
     const searchInput = document.getElementById('search-input');
@@ -257,6 +262,23 @@ document.addEventListener('DOMContentLoaded', () => {
         closeLoginBtn.addEventListener('click', () => {
             loginModal.classList.add('hidden');
             loginError.textContent = '';
+            loginSuccess.style.display = 'none';
+        });
+
+        toggleAuthModeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            isLoginMode = !isLoginMode;
+            loginError.textContent = '';
+            loginSuccess.style.display = 'none';
+            if (isLoginMode) {
+                authModalTitle.textContent = 'Welcome Back';
+                authSubmitBtn.textContent = 'Login';
+                toggleAuthModeBtn.textContent = 'Need an account? Sign up';
+            } else {
+                authModalTitle.textContent = 'Create Account';
+                authSubmitBtn.textContent = 'Sign Up';
+                toggleAuthModeBtn.textContent = 'Already have an account? Login';
+            }
         });
 
         loginForm.addEventListener('submit', async (e) => {
@@ -264,13 +286,33 @@ document.addEventListener('DOMContentLoaded', () => {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             
-            const { error } = await window.db.login(email, password);
-            if (error) {
-                loginError.textContent = error.message;
+            loginError.textContent = '';
+            loginSuccess.style.display = 'none';
+
+            if (isLoginMode) {
+                const { error } = await window.db.login(email, password);
+                if (error) {
+                    loginError.textContent = error.message;
+                } else {
+                    loginModal.classList.add('hidden');
+                    loginForm.reset();
+                }
             } else {
-                loginModal.classList.add('hidden');
-                loginForm.reset();
-                loginError.textContent = '';
+                const { data, error } = await window.db.signup(email, password);
+                if (error) {
+                    loginError.textContent = error.message;
+                } else {
+                    // Check if email confirmation is required by Supabase settings
+                    if (data.user && data.user.identities && data.user.identities.length === 0) {
+                        loginError.textContent = 'Email already in use.';
+                    } else if (data.session === null) {
+                        loginSuccess.textContent = 'Account created! Please check your email to confirm.';
+                        loginSuccess.style.display = 'block';
+                    } else {
+                        loginModal.classList.add('hidden');
+                        loginForm.reset();
+                    }
+                }
             }
         });
 

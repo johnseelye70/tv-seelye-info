@@ -18,6 +18,11 @@ const db = {
         return { data, error };
     },
 
+    async signup(email, password) {
+        const { data, error } = await supabaseClient.auth.signUp({ email, password });
+        return { data, error };
+    },
+
     async logout() {
         const { error } = await supabaseClient.auth.signOut();
         return { error };
