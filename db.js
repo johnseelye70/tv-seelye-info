@@ -129,6 +129,37 @@ const db = {
             
         if (error) console.error("Error inserting content item:", error);
         return { data, error };
+    },
+
+    async getSystemSetting(key) {
+        if (!supabaseClient) return null;
+        try {
+            const { data, error } = await supabaseClient
+                .from('system_settings')
+                .select('value')
+                .eq('id', key)
+                .single();
+            if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned", which is fine for a missing setting
+                console.error("Error fetching setting:", error);
+            }
+            return data?.value || null;
+        } catch(e) { return null; }
+    },
+
+    async setSystemSetting(key, value) {
+        if (!supabaseClient) return { error: new Error('Supabase client not initialized') };
+        
+        const { data, error } = await supabaseClient
+            .from('system_settings')
+            .upsert({ 
+                id: key, 
+                value: value,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'id' })
+            .select();
+            
+        if (error) console.error("Error setting system setting:", error);
+        return { data, error };
     }
 };
 

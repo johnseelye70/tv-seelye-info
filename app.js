@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const catalogSection = document.querySelector('.catalog-section');
     const filtersSection = document.querySelector('.filters-section');
     
+    const adminSettingsCard = document.getElementById('admin-settings-card');
     const tmdbApiKeyInput = document.getElementById('tmdb-api-key');
     const saveTmdbKeyBtn = document.getElementById('save-tmdb-key-btn');
     const tmdbKeyStatus = document.getElementById('tmdb-key-status');
@@ -341,15 +342,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // --- Admin Logic ---
-        adminNavBtn.addEventListener('click', () => {
+        adminNavBtn.addEventListener('click', async () => {
             catalogSection.style.display = 'none';
             filtersSection.style.display = 'none';
             adminSection.classList.remove('hidden');
             
-            const savedKey = localStorage.getItem('tmdb_api_key');
-            if (savedKey) {
-                tmdbApiKeyInput.value = savedKey;
+            // Check cloud settings for API Key
+            const cloudKey = await window.db.getSystemSetting('tmdb_api_key');
+            if (cloudKey) {
+                // Key exists in cloud, hide the input completely
+                adminSettingsCard.style.display = 'none';
                 adminSearchCard.style.display = 'block';
+                // Cache it locally so search button can read it instantly
+                localStorage.setItem('tmdb_api_key', cloudKey);
+            } else {
+                adminSettingsCard.style.display = 'block';
+                // Fallback to local storage if not in cloud yet
+                const savedKey = localStorage.getItem('tmdb_api_key');
+                if (savedKey) {
+                    tmdbApiKeyInput.value = savedKey;
+                    adminSearchCard.style.display = 'block';
+                }
             }
         });
 
@@ -360,14 +373,28 @@ document.addEventListener('DOMContentLoaded', () => {
             init(); // Refresh data
         });
 
-        saveTmdbKeyBtn.addEventListener('click', () => {
+        saveTmdbKeyBtn.addEventListener('click', async () => {
             const key = tmdbApiKeyInput.value.trim();
             if (key) {
-                localStorage.setItem('tmdb_api_key', key);
-                tmdbKeyStatus.textContent = 'Key saved securely in browser!';
+                tmdbKeyStatus.textContent = 'Saving to cloud...';
                 tmdbKeyStatus.style.display = 'block';
-                adminSearchCard.style.display = 'block';
-                setTimeout(() => tmdbKeyStatus.style.display = 'none', 3000);
+                
+                const { error } = await window.db.setSystemSetting('tmdb_api_key', key);
+                
+                if (error) {
+                    tmdbKeyStatus.textContent = 'Error saving key: ' + error.message;
+                    tmdbKeyStatus.style.color = '#ff4444';
+                } else {
+                    localStorage.setItem('tmdb_api_key', key);
+                    tmdbKeyStatus.textContent = 'Key saved securely in the cloud!';
+                    tmdbKeyStatus.style.color = 'var(--success-color)';
+                    
+                    // Hide the settings card after a short delay since it's now cloud-synced
+                    setTimeout(() => {
+                        adminSettingsCard.style.display = 'none';
+                        adminSearchCard.style.display = 'block';
+                    }, 1500);
+                }
             }
         });
 
