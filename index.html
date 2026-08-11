@@ -15,7 +15,8 @@
             <span class="domain">tv.seelye.info</span>
         </div>
         <div class="auth-section">
-            <span id="auth-status-badge" class="badge">Checking auth...</span>
+            <button id="admin-nav-btn" class="btn secondary-btn hidden" style="margin-right: 10px;">Admin</button>
+            <span id="auth-status-badge" class="auth-badge">Checking auth...</span>
             <button id="auth-btn" class="btn primary-btn">Login</button>
         </div>
     </header>
@@ -35,7 +36,7 @@
                 <button class="pill-btn active" data-service="all">All</button>
                 <button class="pill-btn" data-service="netflix">Netflix</button>
                 <button class="pill-btn" data-service="disney">Disney+</button>
-                <button class="pill-btn" data-service="max">Max</button>
+                <button class="pill-btn" data-service="peacock">Peacock</button>
                 <button class="pill-btn" data-service="hulu">Hulu</button>
                 <button class="pill-btn" data-service="prime">Prime Video</button>
             </div>
@@ -48,6 +49,36 @@
         <section class="catalog-section">
             <div class="catalog-grid" id="catalog-grid">
                 <!-- Content cards will be injected here via app.js -->
+            </div>
+        </section>
+
+        <!-- Admin Panel Section -->
+        <section class="admin-section hidden" id="admin-section">
+            <div class="admin-header">
+                <h2>Admin Tools: Add Shows</h2>
+                <button id="close-admin-btn" class="btn secondary-btn">Back to Catalog</button>
+            </div>
+            
+            <div class="admin-settings-card">
+                <h3>TMDB Integration</h3>
+                <p>Enter your TMDB API Read Access Token (v3 or v4) to enable searching.</p>
+                <div class="input-group">
+                    <input type="password" id="tmdb-api-key" placeholder="Enter TMDB API Key..." style="width: 100%; max-width: 500px;">
+                    <button id="save-tmdb-key-btn" class="btn primary-btn">Save Key Locally</button>
+                </div>
+                <p id="tmdb-key-status" class="success-msg" style="display: none; margin-top: 10px;"></p>
+            </div>
+
+            <div class="admin-search-card" id="admin-search-card" style="display: none;">
+                <h3>Search TMDB</h3>
+                <div class="input-group" style="display: flex; gap: 10px;">
+                    <input type="text" id="tmdb-search-query" placeholder="Search for a TV show (e.g. Breaking Bad)..." style="flex: 1;">
+                    <button id="tmdb-search-btn" class="btn primary-btn">Search</button>
+                </div>
+                
+                <div id="tmdb-results-grid" class="catalog-grid" style="margin-top: 2rem;">
+                    <!-- TMDB Results populated here -->
+                </div>
             </div>
         </section>
     </main>

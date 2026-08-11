@@ -25,6 +25,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('search-input');
     const nextUpCard = document.getElementById('next-up-card');
 
+    // Admin Elements
+    const adminNavBtn = document.getElementById('admin-nav-btn');
+    const adminSection = document.getElementById('admin-section');
+    const closeAdminBtn = document.getElementById('close-admin-btn');
+    const catalogSection = document.querySelector('.catalog-section');
+    const filtersSection = document.querySelector('.filters-section');
+    
+    const tmdbApiKeyInput = document.getElementById('tmdb-api-key');
+    const saveTmdbKeyBtn = document.getElementById('save-tmdb-key-btn');
+    const tmdbKeyStatus = document.getElementById('tmdb-key-status');
+    const adminSearchCard = document.getElementById('admin-search-card');
+    const tmdbSearchQuery = document.getElementById('tmdb-search-query');
+    const tmdbSearchBtn = document.getElementById('tmdb-search-btn');
+    const tmdbResultsGrid = document.getElementById('tmdb-results-grid');
+
     // --- Initialization ---
     async function init() {
         // Setup Auth Listener
@@ -71,12 +86,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateAuthUI() {
         if (currentUser) {
             authStatusBadge.textContent = currentUser.email;
-            authStatusBadge.classList.add('logged-in');
             authBtn.textContent = 'Logout';
+            adminNavBtn.classList.remove('hidden');
         } else {
             authStatusBadge.textContent = 'Guest';
-            authStatusBadge.classList.remove('logged-in');
             authBtn.textContent = 'Login';
+            adminNavBtn.classList.add('hidden');
         }
     }
 
@@ -119,19 +134,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="card-title">${item.title}</div>
                     <div class="card-meta">${year} • ${item.type === 'series_season' ? 'Series' : 'Movie'}</div>
                     <div class="card-actions">
-                        <label class="checkbox-wrapper">
-                            <input type="checkbox" class="status-toggle" data-id="${item.id}" ${isCompleted ? 'checked' : ''} ${!currentUser ? 'disabled' : ''}>
-                            <span>Completed</span>
-                        </label>
+                        <button class="mark-btn" data-id="${item.id}" data-status="${isCompleted ? 'completed' : 'none'}">
+                            ${isCompleted ? 'Completed' : 'Mark as Completed'}
+                        </button>
                     </div>
                 </div>
             `;
             catalogGrid.appendChild(card);
-        });
-
-        // Attach event listeners to checkboxes
-        document.querySelectorAll('.status-toggle').forEach(checkbox => {
-            checkbox.addEventListener('change', handleStatusToggle);
         });
     }
 
@@ -206,30 +215,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Return the first index
         return remainingContent.length > 0 ? remainingContent[0] : null;
-    }
-
-    async function handleStatusToggle(e) {
-        const itemId = e.target.dataset.id;
-        const isCompleted = e.target.checked;
-        const newStatus = isCompleted ? 'completed' : 'planning';
-
-        // Optimistic UI update
-        const card = e.target.closest('.content-card');
-        if (isCompleted) {
-            card.classList.add('completed');
-        } else {
-            card.classList.remove('completed');
-        }
-
-        updateLocalWatchlist(itemId, newStatus);
-        renderNextUp();
-
-        // Database write
-        const { error } = await window.db.upsertWatchlistItem(currentUser.id, itemId, newStatus);
-        if (error) {
-            console.error("Failed to update status in DB", error);
-            // Revert optimistic update on failure (optional robust handling)
-        }
     }
 
     async function handleDirectComplete(itemId) {
@@ -334,6 +319,157 @@ document.addEventListener('DOMContentLoaded', () => {
             searchQuery = e.target.value;
             renderCatalog();
         });
+
+        // Filter Bar
+        catalogGrid.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('mark-btn')) {
+                if (!currentUser) {
+                    alert("Please login to track your watchlist.");
+                    return;
+                }
+                const itemId = e.target.dataset.id;
+                const newStatus = e.target.dataset.status === 'completed' ? 'none' : 'completed';
+                
+                // Optimistic UI Update
+                updateLocalWatchlist(itemId, newStatus);
+                renderCatalog();
+                renderNextUp();
+
+                // Backend Update
+                await window.db.upsertWatchlistItem(currentUser.id, itemId, newStatus);
+            }
+        });
+
+        // --- Admin Logic ---
+        adminNavBtn.addEventListener('click', () => {
+            catalogSection.style.display = 'none';
+            filtersSection.style.display = 'none';
+            adminSection.classList.remove('hidden');
+            
+            const savedKey = localStorage.getItem('tmdb_api_key');
+            if (savedKey) {
+                tmdbApiKeyInput.value = savedKey;
+                adminSearchCard.style.display = 'block';
+            }
+        });
+
+        closeAdminBtn.addEventListener('click', () => {
+            adminSection.classList.add('hidden');
+            catalogSection.style.display = 'block';
+            filtersSection.style.display = 'block';
+            init(); // Refresh data
+        });
+
+        saveTmdbKeyBtn.addEventListener('click', () => {
+            const key = tmdbApiKeyInput.value.trim();
+            if (key) {
+                localStorage.setItem('tmdb_api_key', key);
+                tmdbKeyStatus.textContent = 'Key saved securely in browser!';
+                tmdbKeyStatus.style.display = 'block';
+                adminSearchCard.style.display = 'block';
+                setTimeout(() => tmdbKeyStatus.style.display = 'none', 3000);
+            }
+        });
+
+        tmdbSearchBtn.addEventListener('click', async () => {
+            const query = tmdbSearchQuery.value.trim();
+            const key = localStorage.getItem('tmdb_api_key');
+            if (!query || !key) return;
+
+            tmdbSearchBtn.textContent = 'Searching...';
+            try {
+                const res = await fetch(`https://api.themoviedb.org/3/search/tv?api_key=${key}&query=${encodeURIComponent(query)}`);
+                const data = await res.json();
+                renderTmdbResults(data.results || []);
+            } catch (e) {
+                console.error("TMDB Error", e);
+                alert("Failed to fetch from TMDB. Check your API key.");
+            }
+            tmdbSearchBtn.textContent = 'Search';
+        });
+    }
+
+    function renderTmdbResults(results) {
+        tmdbResultsGrid.innerHTML = '';
+        if (results.length === 0) {
+            tmdbResultsGrid.innerHTML = '<p>No results found.</p>';
+            return;
+        }
+
+        // Build dropdown options for services and franchises
+        const serviceOptions = allServices.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        const franchiseOptions = allFranchises.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+
+        results.slice(0, 12).forEach(item => {
+            const poster = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/300x450/111111/fff?text=No+Image';
+            const year = item.first_air_date ? item.first_air_date.split('-')[0] : 'TBA';
+            
+            const card = document.createElement('div');
+            card.className = 'tmdb-result-card';
+            card.innerHTML = `
+                <img src="${poster}" class="tmdb-poster" alt="${item.name}">
+                <div class="tmdb-info">
+                    <div class="tmdb-title">${item.name}</div>
+                    <div class="tmdb-year">${year}</div>
+                    
+                    <label style="font-size: 0.8rem; margin-top: 10px;">Service</label>
+                    <select class="admin-select-dropdown" id="service-${item.id}">
+                        <option value="">None / Unknown</option>
+                        ${serviceOptions}
+                    </select>
+
+                    <label style="font-size: 0.8rem;">Franchise</label>
+                    <select class="admin-select-dropdown" id="franchise-${item.id}">
+                        <option value="">None / Standalone</option>
+                        ${franchiseOptions}
+                    </select>
+
+                    <label style="font-size: 0.8rem;">Chronological Order (optional)</label>
+                    <input type="number" class="admin-select-dropdown" id="order-${item.id}" placeholder="e.g. 1" style="background: var(--bg-dark); color: white; border: 1px solid var(--border-subtle); padding: 5px;">
+
+                    <button class="btn primary-btn add-supabase-btn" style="margin-top: 10px; width: 100%;" data-tmdb-id="${item.id}" data-title="${item.name.replace(/"/g, '&quot;')}" data-year="${year}" data-poster="${poster}">Add to Database</button>
+                </div>
+            `;
+            tmdbResultsGrid.appendChild(card);
+        });
+
+        // Add Event Listeners for Add Buttons
+        document.querySelectorAll('.add-supabase-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const btnEl = e.target;
+                const tmdbId = btnEl.dataset.tmdbId;
+                const title = btnEl.dataset.title;
+                const year = btnEl.dataset.year;
+                const poster = btnEl.dataset.poster;
+
+                const serviceId = document.getElementById(`service-${tmdbId}`).value;
+                const franchiseId = document.getElementById(`franchise-${tmdbId}`).value;
+                const chronoOrder = document.getElementById(`order-${tmdbId}`).value;
+
+                btnEl.textContent = 'Adding...';
+                btnEl.disabled = true;
+
+                const payload = {
+                    id: tmdbId.toString(),
+                    title: title,
+                    type: 'series_season',
+                    release_year: parseInt(year) || null,
+                    poster_url: poster,
+                    franchise_id: franchiseId || null,
+                    chronological_order: chronoOrder ? parseInt(chronoOrder) : null,
+                    service_id: serviceId || null // Assuming schema uses service_id
+                };
+
+                const { error } = await window.db.insertContentItem(payload);
+                if (error) {
+                    alert("Error: " + error.message);
+                    btnEl.textContent = 'Failed';
+                } else {
+                    btnEl.textContent = 'Added!';
+                    btnEl.style.background = 'var(--success-color)';
+                }
+            });
+        });
     }
 
     // --- Mock Data Fallback ---
@@ -343,11 +479,11 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: '2', title: 'The Book of Boba Fett', type: 'series_season', release_year: 2021, franchise_id: 'f1', mock_franchise: 'Star Wars', chronological_order: 2, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/gNbdjDi1OIRC24nmOblOXqlIQnv.jpg' },
             { id: '3', title: 'Ahsoka', type: 'series_season', release_year: 2023, franchise_id: 'f1', mock_franchise: 'Star Wars', chronological_order: 3, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/q228tJmE6L20s5gLThc2zOqHj8q.jpg' },
             { id: '4', title: 'Stranger Things', type: 'series_season', release_year: 2016, franchise_id: null, chronological_order: null, mock_service: 'netflix', poster_url: 'https://image.tmdb.org/t/p/w500/49WJfeN0moxb9IPfGn8SliM7O14.jpg' },
-            { id: '5', title: 'The Last of Us', type: 'series_season', release_year: 2023, franchise_id: null, chronological_order: null, mock_service: 'max', poster_url: 'https://image.tmdb.org/t/p/w500/uKvVjHNqB5VmOrdxqAt2F7J78ED.jpg' },
+            { id: '5', title: 'The Last of Us', type: 'series_season', release_year: 2023, franchise_id: null, chronological_order: null, mock_service: 'peacock', poster_url: 'https://image.tmdb.org/t/p/w500/uKvVjHNqB5VmOrdxqAt2F7J78ED.jpg' },
             { id: '6', title: 'The Bear', type: 'series_season', release_year: 2022, franchise_id: null, chronological_order: null, mock_service: 'hulu', poster_url: 'https://image.tmdb.org/t/p/w500/sY6u6vPoyWkHqGg7V02GTV4B9pZ.jpg' },
             { id: '7', title: 'WandaVision', type: 'series_season', release_year: 2021, franchise_id: 'f2', mock_franchise: 'Marvel', chronological_order: 1, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/glKDfE6btIRcVB5zrjspRIs4r52.jpg' },
             { id: '8', title: 'Loki', type: 'series_season', release_year: 2021, franchise_id: 'f2', mock_franchise: 'Marvel', chronological_order: 2, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/kEl2t3OhXc3Zb9FBh1AuYzRTgZp.jpg' },
-            { id: '9', title: 'House of the Dragon', type: 'series_season', release_year: 2022, franchise_id: null, chronological_order: null, mock_service: 'max', poster_url: 'https://image.tmdb.org/t/p/w500/1X4h40fcBaqcg9cgEV13koOSNfl.jpg' },
+            { id: '9', title: 'House of the Dragon', type: 'series_season', release_year: 2022, franchise_id: null, chronological_order: null, mock_service: 'peacock', poster_url: 'https://image.tmdb.org/t/p/w500/1X4h40fcBaqcg9cgEV13koOSNfl.jpg' },
             { id: '10', title: 'The Boys', type: 'series_season', release_year: 2019, franchise_id: null, chronological_order: null, mock_service: 'prime', poster_url: 'https://image.tmdb.org/t/p/w500/7Ns6tOqsT7h2LqF21c2G4t9q30Z.jpg' },
             { id: '11', title: 'Invincible', type: 'series_season', release_year: 2021, franchise_id: null, chronological_order: null, mock_service: 'prime', poster_url: 'https://image.tmdb.org/t/p/w500/y20p5ZpYngF2kUeA4JjG1W3tYIu.jpg' },
             { id: '12', title: 'Shōgun', type: 'series_season', release_year: 2024, franchise_id: null, chronological_order: null, mock_service: 'hulu', poster_url: 'https://image.tmdb.org/t/p/w500/7O4iVfOMQmdCSxhOg1WNzG1AoQk.jpg' }
