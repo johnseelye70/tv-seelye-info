@@ -9,6 +9,17 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="debug-error-box" style="display:none; background: #ff0000; color: white; padding: 20px; font-weight: bold; position: fixed; top: 0; left: 0; width: 100%; z-index: 9999;"></div>
+    <script>
+        window.addEventListener('error', function(e) {
+            document.getElementById('debug-error-box').style.display = 'block';
+            document.getElementById('debug-error-box').innerHTML += e.message + '<br>' + e.filename + ':' + e.lineno + '<br>';
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            document.getElementById('debug-error-box').style.display = 'block';
+            document.getElementById('debug-error-box').innerHTML += 'Unhandled Promise Rejection: ' + e.reason + '<br>';
+        });
+    </script>
     <header class="site-header">
         <div class="logo">
             <h1>Seelye TV Hub</h1>

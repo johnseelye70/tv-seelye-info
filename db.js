@@ -36,6 +36,7 @@ const db = {
     },
 
     onAuthStateChange(callback) {
+        if (!supabase) return;
         supabase.auth.onAuthStateChange((event, session) => {
             callback(event, session);
         });
