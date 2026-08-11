@@ -4,9 +4,9 @@
 const SUPABASE_URL = window.ENV_SUPABASE_URL || 'https://nmawldbjspiefwcnykuk.supabase.co';
 const SUPABASE_ANON_KEY = window.ENV_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tYXdsZGJqc3BpZWZ3Y255a3VrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Njc5OTUsImV4cCI6MjEwMjA0Mzk5NX0.m67NQPyXjtbaoeXSUiUUUm8lbEJgO3NXJIlMeJTVnNU';
 
-let supabase;
+let supabaseClient;
 try {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 } catch (e) {
     console.error("Supabase Initialization Error. Please ensure SUPABASE_URL starts with https://", e);
 }
@@ -14,19 +14,19 @@ try {
 const db = {
     // Auth logic
     async login(email, password) {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
         return { data, error };
     },
 
     async logout() {
-        const { error } = await supabase.auth.signOut();
+        const { error } = await supabaseClient.auth.signOut();
         return { error };
     },
 
     async getCurrentUser() {
-        if (!supabase) return null;
+        if (!supabaseClient) return null;
         try {
-            const { data, error } = await supabase.auth.getUser();
+            const { data, error } = await supabaseClient.auth.getUser();
             if (error) console.warn("Auth check:", error.message);
             return data?.user || null;
         } catch (e) {
@@ -36,35 +36,35 @@ const db = {
     },
 
     onAuthStateChange(callback) {
-        if (!supabase) return;
-        supabase.auth.onAuthStateChange((event, session) => {
+        if (!supabaseClient) return;
+        supabaseClient.auth.onAuthStateChange((event, session) => {
             callback(event, session);
         });
     },
 
     // Data Fetching Logic
     async getStreamingServices() {
-        if (!supabase) return [];
+        if (!supabaseClient) return [];
         try {
-            const { data, error } = await supabase.from('streaming_services').select('*');
+            const { data, error } = await supabaseClient.from('streaming_services').select('*');
             if (error) console.error("Error fetching streaming services:", error);
             return data || [];
         } catch(e) { return []; }
     },
 
     async getFranchises() {
-        if (!supabase) return [];
+        if (!supabaseClient) return [];
         try {
-            const { data, error } = await supabase.from('franchises').select('*');
+            const { data, error } = await supabaseClient.from('franchises').select('*');
             if (error) console.error("Error fetching franchises:", error);
             return data || [];
         } catch(e) { return []; }
     },
 
     async getContentItems() {
-        if (!supabase) return [];
+        if (!supabaseClient) return [];
         try {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('content_items')
                 .select(`
                     *,
@@ -79,9 +79,9 @@ const db = {
     },
 
     async getUserWatchlist(userId) {
-        if (!userId || !supabase) return [];
+        if (!userId || !supabaseClient) return [];
         try {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('user_watchlist')
                 .select('*')
                 .eq('user_id', userId);
@@ -95,7 +95,7 @@ const db = {
     async upsertWatchlistItem(userId, contentItemId, status) {
         if (!userId) return { error: new Error('User not logged in') };
         
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('user_watchlist')
             .upsert({ 
                 user_id: userId, 
