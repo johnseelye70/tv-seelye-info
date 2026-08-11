@@ -51,45 +51,16 @@
                 <!-- Content cards will be injected here via app.js -->
             </div>
         </section>
-
-        <!-- Admin Panel Section -->
-        <section class="admin-section hidden" id="admin-section">
-            <div class="admin-header">
-                <h2>Admin Tools: Add Shows</h2>
-                <button id="close-admin-btn" class="btn secondary-btn">Back to Catalog</button>
-            </div>
-            
-            <div class="admin-settings-card" id="admin-settings-card">
-                <h3>TMDB Integration</h3>
-                <p>Enter your <strong>API Key (v3 auth)</strong> to enable searching. Do not use the long Read Access Token.</p>
-                <div class="input-group">
-                    <input type="password" id="tmdb-api-key" placeholder="Enter TMDB API Key..." style="width: 100%; max-width: 500px;">
-                    <button id="save-tmdb-key-btn" class="btn primary-btn">Save Key Locally</button>
-                </div>
-                <p id="tmdb-key-status" class="success-msg" style="display: none; margin-top: 10px;"></p>
-            </div>
-
-            <div class="admin-search-card" id="admin-search-card" style="display: none;">
-                <h3>Search TMDB</h3>
-                <div class="input-group" style="display: flex; gap: 10px;">
-                    <input type="text" id="tmdb-search-query" placeholder="Search for a TV show (e.g. Breaking Bad)..." style="flex: 1;">
-                    <button id="tmdb-search-btn" class="btn primary-btn">Search</button>
-                </div>
-                
-                <div id="tmdb-results-grid" class="catalog-grid" style="margin-top: 2rem;">
-                    <!-- TMDB Results populated here -->
-                </div>
-            </div>
-        </section>
     </main>
 
     <footer class="site-footer">
         <div class="version-info">
-            <strong>Version: Beta 0.4.0</strong>
+            <strong>Version: Beta 0.4.1</strong>
         </div>
         <div class="changelog">
             <h3>Version History</h3>
             <ul>
+                <li><strong>Beta 0.4.1</strong> - Converted Admin Panel to a clean Modal UI overlay to fix catalog visibility bugs.</li>
                 <li><strong>Beta 0.4.0</strong> - Implemented Cloud System Settings syncing. The TMDB API Key now saves securely to the database and automatically hides the setup screen for all users.</li>
                 <li><strong>Beta 0.3.0</strong> - Added inline Admin Panel with TMDB Search API integration. Replaced Max filter with Peacock.</li>
                 <li><strong>Beta 0.2.0</strong> - Added in-app Sign Up functionality and improved database connection stability.</li>
@@ -97,6 +68,37 @@
             </ul>
         </div>
     </footer>
+
+    <!-- Admin Modal -->
+    <div id="admin-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <div class="admin-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 15px; margin-bottom: 20px;">
+                <h2 style="margin: 0;">Admin Tools: Add Shows</h2>
+                <button id="close-admin-btn" class="btn secondary-btn" style="background: transparent; color: white; font-size: 1.5rem; padding: 0 10px; border: none;">&times;</button>
+            </div>
+            
+            <div class="admin-settings-card" id="admin-settings-card">
+                <h3>TMDB Integration</h3>
+                <p>Enter your <strong>API Key (v3 auth)</strong> to enable searching. Do not use the long Read Access Token.</p>
+                <div class="input-group">
+                    <input type="password" id="tmdb-api-key" placeholder="Enter TMDB API Key..." style="width: 100%; max-width: 500px;">
+                    <button id="save-tmdb-key-btn" class="btn primary-btn">Save Key Securely</button>
+                </div>
+                <div id="tmdb-key-status" class="status-msg" style="display: none; margin-top: 10px;"></div>
+            </div>
+
+            <div class="admin-settings-card" id="admin-search-card" style="display: none;">
+                <h3>Search TMDB</h3>
+                <div class="input-group">
+                    <input type="text" id="tmdb-search-query" placeholder="Search for a TV show (e.g. Breaking Bad)..." style="width: 100%;">
+                    <button id="tmdb-search-btn" class="btn primary-btn">Search</button>
+                </div>
+                <div class="tmdb-results-grid" id="tmdb-results-grid" style="margin-top: 20px;">
+                    <!-- JS Injects Results Here -->
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Login Modal -->
     <div id="login-modal" class="modal hidden">
@@ -125,7 +127,7 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="db.js?v=0.4.0"></script>
-    <script src="app.js?v=0.4.0"></script>
+    <script src="db.js?v=0.4.1"></script>
+    <script src="app.js?v=0.4.1"></script>
 </body>
 </html>

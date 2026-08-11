@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Admin Elements
     const adminNavBtn = document.getElementById('admin-nav-btn');
-    const adminSection = document.getElementById('admin-section');
+    const adminModal = document.getElementById('admin-modal');
     const closeAdminBtn = document.getElementById('close-admin-btn');
     const catalogSection = document.querySelector('.catalog-section');
     const filtersSection = document.querySelector('.filters-section');
@@ -343,9 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- Admin Logic ---
         adminNavBtn.addEventListener('click', async () => {
-            catalogSection.style.display = 'none';
-            filtersSection.style.display = 'none';
-            adminSection.classList.remove('hidden');
+            adminModal.classList.remove('hidden');
             
             // Check cloud settings for API Key
             const cloudKey = await window.db.getSystemSetting('tmdb_api_key');
@@ -367,9 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         closeAdminBtn.addEventListener('click', () => {
-            adminSection.classList.add('hidden');
-            catalogSection.style.display = 'block';
-            filtersSection.style.display = 'block';
+            adminModal.classList.add('hidden');
             init(); // Refresh data
         });
 
