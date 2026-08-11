@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seelye TV Hub</title>
+    <!-- Import Supabase via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="logo">
+            <h1>Seelye TV Hub</h1>
+            <span class="domain">tv.seelye.info</span>
+        </div>
+        <div class="auth-section">
+            <span id="auth-status-badge" class="badge">Checking auth...</span>
+            <button id="auth-btn" class="btn primary-btn">Login</button>
+        </div>
+    </header>
+
+    <main class="dashboard">
+        <!-- Franchise Next-Up Map Hero Section -->
+        <section class="hero next-up-section" id="next-up-container">
+            <h2>Chronological Next Up</h2>
+            <div class="next-up-card" id="next-up-card">
+                <div class="skeleton-loader">Loading your next chronological watch...</div>
+            </div>
+        </section>
+
+        <!-- Service Filter Bar -->
+        <section class="filters-section">
+            <div class="filter-bar" id="service-filters">
+                <button class="pill-btn active" data-service="all">All</button>
+                <button class="pill-btn" data-service="netflix">Netflix</button>
+                <button class="pill-btn" data-service="disney">Disney+</button>
+                <button class="pill-btn" data-service="max">Max</button>
+                <button class="pill-btn" data-service="hulu">Hulu</button>
+                <button class="pill-btn" data-service="prime">Prime Video</button>
+            </div>
+            <div class="search-bar">
+                <input type="text" id="search-input" placeholder="Search shows, movies...">
+            </div>
+        </section>
+
+        <!-- Main Catalog Grid -->
+        <section class="catalog-section">
+            <div class="catalog-grid" id="catalog-grid">
+                <!-- Content cards will be injected here via app.js -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Welcome Back</h2>
+            <form id="login-form">
+                <div class="input-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" required>
+                </div>
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn secondary-btn" id="close-login-btn">Cancel</button>
+                    <button type="submit" class="btn primary-btn">Login</button>
+                </div>
+            </form>
+            <p id="login-error" class="error-msg"></p>
+        </div>
+    </div>
+
+    <!-- Application Logic -->
+    <script src="db.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
