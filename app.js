@@ -1,4 +1,19 @@
 document.addEventListener('DOMContentLoaded', () => {
+
+    // Global Error Catcher for Debugging on User's Screen
+    window.addEventListener('error', function(e) {
+        const err = document.createElement('div');
+        err.style = "position:fixed; top:0; left:0; width:100%; background:red; color:white; z-index:9999; padding:10px;";
+        err.textContent = "Error: " + e.message;
+        document.body.appendChild(err);
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+        const err = document.createElement('div');
+        err.style = "position:fixed; top:40px; left:0; width:100%; background:orange; color:white; z-index:9999; padding:10px;";
+        err.textContent = "Promise Error: " + (e.reason?.message || e.reason);
+        document.body.appendChild(err);
+    });
+
     // State
     let currentUser = null;
     let allContent = [];
@@ -168,23 +183,39 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderCatalog() {
         catalogGrid.innerHTML = '';
         
-        let filteredContent = allContent.filter(item => {
-            if (searchQuery && !item.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-            if (currentFilter !== 'all') {
-                const serviceName = item.streaming_services?.name?.toLowerCase() || item.mock_service?.toLowerCase();
-                if (serviceName !== currentFilter) return false;
-            }
-            return true;
-        });
-
-        if (filteredContent.length === 0) {
-            catalogGrid.innerHTML = '<p class="skeleton-loader">No library content found.</p>';
+        let filteredContent = [];
+        try {
+            filteredContent = allContent.filter(item => {
+                if (!item) return false;
+                const title = item.title || '';
+                if (searchQuery && !title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+                if (currentFilter !== 'all') {
+                    const serviceName = item.streaming_services?.name?.toLowerCase() || item.mock_service?.toLowerCase();
+                    if (serviceName !== currentFilter) return false;
+                }
+                return true;
+            });
+        } catch (e) {
+            console.error("Filter error:", e);
+            catalogGrid.innerHTML = `<p class="error-msg">Error filtering content: ${e.message}</p>`;
             return;
         }
 
+        if (filteredContent.length === 0) {
+            let reason = searchQuery ? ` matching "${searchQuery}"` : '';
+            catalogGrid.innerHTML = `<p class="skeleton-loader">No library content found${reason}.</p>`;
+            return;
+        }
+
+        let htmlString = '';
         filteredContent.forEach(item => {
-            catalogGrid.innerHTML += createCardHTML(item);
+            try {
+                htmlString += createCardHTML(item);
+            } catch(e) {
+                console.error("Render card error:", e);
+            }
         });
+        catalogGrid.innerHTML = htmlString;
     }
 
     function renderContinueWatching() {

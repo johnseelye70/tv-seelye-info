@@ -14,13 +14,23 @@ try {
 const db = {
     // Auth logic
     async login(email, password) {
-        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        return { data, error };
+        if (!supabaseClient) return { error: new Error('Database not connected. Please check your internet or ad-blocker.') };
+        try {
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            return { data, error };
+        } catch (e) {
+            return { error: e };
+        }
     },
 
     async signup(email, password) {
-        const { data, error } = await supabaseClient.auth.signUp({ email, password });
-        return { data, error };
+        if (!supabaseClient) return { error: new Error('Database not connected. Please check your internet or ad-blocker.') };
+        try {
+            const { data, error } = await supabaseClient.auth.signUp({ email, password });
+            return { data, error };
+        } catch (e) {
+            return { error: e };
+        }
     },
 
     async logout() {
