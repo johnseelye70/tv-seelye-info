@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const catalogGrid = document.getElementById('catalog-grid');
     const serviceFilters = document.getElementById('service-filters');
-    const searchInput = document.getElementById('search-input');
+    const searchInput = document.getElementById('library-filter-field');
     
     // New Carousels
     const continueWatchingContainer = document.getElementById('continue-watching-container');
