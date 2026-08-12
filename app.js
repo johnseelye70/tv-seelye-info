@@ -460,29 +460,29 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // --- Admin Logic ---
-        adminNavBtn.addEventListener('click', async () => {
-            adminModal.classList.remove('hidden');
-            const cloudKey = await window.db.getSystemSetting('tmdb_api_key');
-            if (cloudKey) {
-                adminSettingsCard.style.display = 'none';
-                adminSearchCard.style.display = 'block';
-                localStorage.setItem('tmdb_api_key', cloudKey);
-            } else {
-                adminSettingsCard.style.display = 'block';
-                const savedKey = localStorage.getItem('tmdb_api_key');
-                if (savedKey) {
-                    tmdbApiKeyInput.value = savedKey;
-                    adminSearchCard.style.display = 'block';
-                }
-            }
+        // --- Admin / Modal Logic ---
+        addShowsBtn.addEventListener('click', () => {
+            addShowsModal.classList.remove('hidden');
+        });
+        
+        closeAddShowsBtn.addEventListener('click', () => {
+            addShowsModal.classList.add('hidden');
         });
 
-        closeAdminBtn.addEventListener('click', () => {
-            adminModal.classList.add('hidden');
-            // Hard reload state
-            allContent = [];
-            init(); 
+        settingsBtn.addEventListener('click', async () => {
+            settingsModal.classList.remove('hidden');
+            const cloudKey = await window.db.getSystemSetting('tmdb_api_key');
+            if (cloudKey) {
+                tmdbApiKeyInput.value = cloudKey;
+                localStorage.setItem('tmdb_api_key', cloudKey);
+            } else {
+                const savedKey = localStorage.getItem('tmdb_api_key');
+                if (savedKey) tmdbApiKeyInput.value = savedKey;
+            }
+        });
+        
+        closeSettingsBtn.addEventListener('click', () => {
+            settingsModal.classList.add('hidden');
         });
 
         saveTmdbKeyBtn.addEventListener('click', async () => {
@@ -499,8 +499,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     tmdbKeyStatus.textContent = 'Key saved securely!';
                     tmdbKeyStatus.style.color = 'var(--success-color)';
                     setTimeout(() => {
-                        adminSettingsCard.style.display = 'none';
-                        adminSearchCard.style.display = 'block';
+                        settingsModal.classList.add('hidden');
                         fetchRecommendations(); // Trigger recs now that key exists
                         renderRecommendations();
                     }, 1000);
