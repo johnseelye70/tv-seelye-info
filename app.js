@@ -625,16 +625,16 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: '1', title: 'The Mandalorian', type: 'series_season', release_year: 2019, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/eU1i6eHXlzMOlEq0ku1Rzq7Y4wA.jpg' },
             { id: '2', title: 'The Book of Boba Fett', type: 'series_season', release_year: 2021, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/gNbdjDi1OIRC24nmOblOXqlIQnv.jpg' },
             { id: '3', title: 'Ahsoka', type: 'series_season', release_year: 2023, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/q228tJmE6L20s5gLThc2zOqHj8q.jpg' },
-            { id: '4', title: 'Stranger Things', type: 'series_season', release_year: 2016, mock_service: 'netflix', poster_url: 'https://image.tmdb.org/t/p/w500/49WJfeN0moxb9IPfGn8SliM7O14.jpg' },
-            { id: '5', title: 'The Office', type: 'series_season', release_year: 2005, mock_service: 'peacock', poster_url: 'https://image.tmdb.org/t/p/w500/qatS1yP6mG4y7h2fD5R51QWJ4V6.jpg' },
-            { id: '6', title: 'The Bear', type: 'series_season', release_year: 2022, mock_service: 'hulu', poster_url: 'https://image.tmdb.org/t/p/w500/sY6u6vPoyWkHqGg7V02GTV4B9pZ.jpg' },
-            { id: '7', title: 'WandaVision', type: 'series_season', release_year: 2021, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/glKDfE6btIRcVB5zrjspRIs4r52.jpg' },
-            { id: '8', title: 'Loki', type: 'series_season', release_year: 2021, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/kEl2t3OhXc3Zb9FBh1AuYzRTgZp.jpg' },
-            { id: '9', title: 'Parks and Recreation', type: 'series_season', release_year: 2009, mock_service: 'peacock', poster_url: 'https://image.tmdb.org/t/p/w500/lXylq5d0dK7uJ9W8vC5p4F1b4p.jpg' },
-            { id: '10', title: 'The Boys', type: 'series_season', release_year: 2019, mock_service: 'prime', poster_url: 'https://image.tmdb.org/t/p/w500/7Ns6tOqsT7h2LqF21c2G4t9q30Z.jpg' },
-            { id: '11', title: 'Invincible', type: 'series_season', release_year: 2021, mock_service: 'prime', poster_url: 'https://image.tmdb.org/t/p/w500/y20p5ZpYngF2kUeA4JjG1W3tYIu.jpg' },
-            { id: '12', title: 'Shōgun', type: 'series_season', release_year: 2024, mock_service: 'hulu', poster_url: 'https://image.tmdb.org/t/p/w500/7O4iVfOMQmdCSxhOg1WNzG1AoQk.jpg' },
-            { id: '13', title: 'Critical Role', type: 'series_season', release_year: 2015, mock_service: 'youtube', poster_url: 'https://image.tmdb.org/t/p/w500/r51296x08yN6W7sP0Rk.jpg' } // Added generic youtube example
+            { id: '4', title: 'Stranger Things', type: 'series_season', release_year: 2016, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/595/1489169.jpg' },
+            { id: '5', title: 'The Office', type: 'series_season', release_year: 2005, mock_service: 'peacock', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/481/1204342.jpg' },
+            { id: '6', title: 'The Bear', type: 'series_season', release_year: 2022, mock_service: 'hulu', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/629/1574642.jpg' },
+            { id: '7', title: 'WandaVision', type: 'series_season', release_year: 2021, mock_service: 'disney', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/295/738028.jpg' },
+            { id: '8', title: 'Loki', type: 'series_season', release_year: 2021, mock_service: 'disney', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/478/1195717.jpg' },
+            { id: '9', title: 'Parks and Recreation', type: 'series_season', release_year: 2009, mock_service: 'peacock', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/481/1204341.jpg' },
+            { id: '10', title: 'The Boys', type: 'series_season', release_year: 2019, mock_service: 'prime', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/619/1547768.jpg' },
+            { id: '11', title: 'Invincible', type: 'series_season', release_year: 2021, mock_service: 'prime', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/618/1545777.jpg' },
+            { id: '12', title: 'Shōgun', type: 'series_season', release_year: 2024, mock_service: 'hulu', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/506/1265637.jpg' },
+            { id: '13', title: 'Critical Role', type: 'series_season', release_year: 2015, mock_service: 'youtube', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/379/948363.jpg' }
         ];
     }
 
