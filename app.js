@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         allContent = await window.db.getContentItems();
         
         if (allContent.length === 0) {
-            allContent = getMockData();
+            /* allContent = getMockData(); removed */
         }
 
         await loadUserData();
