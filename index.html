@@ -51,7 +51,10 @@
                 <button class="pill-btn" data-service="youtube">YouTube TV</button>
             </div>
             <div class="search-bar" style="margin-top: 15px;">
-                <input type="text" id="library-filter-field" placeholder="Search library..." autocomplete="off" data-lpignore="true" spellcheck="false" autocorrect="off">
+                <!-- Decoy inputs for aggressive password managers -->
+                <input type="text" style="display:none;" aria-hidden="true">
+                <input type="password" style="display:none;" aria-hidden="true">
+                <input type="search" id="library-filter-field" placeholder="Search library..." autocomplete="new-password" data-lpignore="true" spellcheck="false" autocorrect="off" readonly onfocus="this.removeAttribute('readonly');">
             </div>
         </section>
 
