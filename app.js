@@ -621,22 +621,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Mock Data Fallback ---
     function getMockData() {
-        return [
-            { id: '1', title: 'The Mandalorian', type: 'series_season', release_year: 2019, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/eU1i6eHXlzMOlEq0ku1Rzq7Y4wA.jpg' },
-            { id: '2', title: 'The Book of Boba Fett', type: 'series_season', release_year: 2021, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/gNbdjDi1OIRC24nmOblOXqlIQnv.jpg' },
-            { id: '3', title: 'Ahsoka', type: 'series_season', release_year: 2023, mock_service: 'disney', poster_url: 'https://image.tmdb.org/t/p/w500/q228tJmE6L20s5gLThc2zOqHj8q.jpg' },
-            { id: '4', title: 'Stranger Things', type: 'series_season', release_year: 2016, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/595/1489169.jpg' },
-            { id: '5', title: 'The Office', type: 'series_season', release_year: 2005, mock_service: 'peacock', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/481/1204342.jpg' },
-            { id: '6', title: 'The Bear', type: 'series_season', release_year: 2022, mock_service: 'hulu', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/629/1574642.jpg' },
-            { id: '7', title: 'WandaVision', type: 'series_season', release_year: 2021, mock_service: 'disney', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/295/738028.jpg' },
-            { id: '8', title: 'Loki', type: 'series_season', release_year: 2021, mock_service: 'disney', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/478/1195717.jpg' },
-            { id: '9', title: 'Parks and Recreation', type: 'series_season', release_year: 2009, mock_service: 'peacock', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/481/1204341.jpg' },
-            { id: '10', title: 'The Boys', type: 'series_season', release_year: 2019, mock_service: 'prime', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/619/1547768.jpg' },
-            { id: '11', title: 'Invincible', type: 'series_season', release_year: 2021, mock_service: 'prime', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/618/1545777.jpg' },
-            { id: '12', title: 'Shōgun', type: 'series_season', release_year: 2024, mock_service: 'hulu', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/506/1265637.jpg' },
-            { id: '13', title: 'Critical Role', type: 'series_season', release_year: 2015, mock_service: 'youtube', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/379/948363.jpg' }
-        ];
-    }
+    return [
+        { id: '1', title: 'The Mandalorian', type: 'series_season', release_year: 2020, mock_service: 'disney', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/501/1253498.jpg' },
+        { id: '2', title: 'The Book of Boba Fett', type: 'series_season', release_year: 2020, mock_service: 'disney', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/501/1253027.jpg' },
+        { id: '3', title: 'Ahsoka', type: 'series_season', release_year: 2020, mock_service: 'disney', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/473/1184972.jpg' },
+        { id: '4', title: 'WandaVision', type: 'series_season', release_year: 2020, mock_service: 'disney', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/295/738028.jpg' },
+        { id: '5', title: 'Loki', type: 'series_season', release_year: 2020, mock_service: 'disney', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/478/1195717.jpg' },
+        { id: '6', title: 'Stranger Things', type: 'series_season', release_year: 2020, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/595/1489169.jpg' },
+        { id: '7', title: 'The Crown', type: 'series_season', release_year: 2020, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/632/1580063.jpg' },
+        { id: '8', title: 'Bridgerton', type: 'series_season', release_year: 2020, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/614/1535959.jpg' },
+        { id: '9', title: 'The Witcher', type: 'series_season', release_year: 2020, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/594/1486674.jpg' },
+        { id: '10', title: 'Squid Game', type: 'series_season', release_year: 2020, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/576/1440521.jpg' },
+        { id: '11', title: 'Ozark', type: 'series_season', release_year: 2020, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/398/996611.jpg' },
+        { id: '12', title: 'The Queen\'s Gambit', type: 'series_season', release_year: 2020, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/510/1275203.jpg' },
+        { id: '13', title: 'The Office', type: 'series_season', release_year: 2020, mock_service: 'peacock', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/481/1204342.jpg' },
+        { id: '14', title: 'Parks and Recreation', type: 'series_season', release_year: 2020, mock_service: 'peacock', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/481/1204341.jpg' },
+        { id: '15', title: 'Yellowstone', type: 'series_season', release_year: 2020, mock_service: 'peacock', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/545/1362616.jpg' },
+        { id: '16', title: 'Brooklyn Nine-Nine', type: 'series_season', release_year: 2020, mock_service: 'peacock', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/402/1007484.jpg' },
+        { id: '17', title: 'The Bear', type: 'series_season', release_year: 2020, mock_service: 'hulu', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/629/1574642.jpg' },
+        { id: '18', title: 'Shōgun', type: 'series_season', release_year: 2020, mock_service: 'hulu', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/506/1265637.jpg' },
+        { id: '19', title: 'The Handmaid\'s Tale', type: 'series_season', release_year: 2020, mock_service: 'hulu', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/562/1406667.jpg' },
+        { id: '20', title: 'Only Murders in the Building', type: 'series_season', release_year: 2020, mock_service: 'hulu', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/586/1466415.jpg' },
+        { id: '21', title: 'Fargo', type: 'series_season', release_year: 2020, mock_service: 'hulu', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/487/1219631.jpg' },
+        { id: '22', title: 'The Boys', type: 'series_season', release_year: 2020, mock_service: 'prime', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/619/1547768.jpg' },
+        { id: '23', title: 'Invincible', type: 'series_season', release_year: 2020, mock_service: 'prime', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/618/1545777.jpg' },
+        { id: '24', title: 'The Marvelous Mrs. Maisel', type: 'series_season', release_year: 2020, mock_service: 'prime', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/456/1141825.jpg' },
+        { id: '25', title: 'Reacher', type: 'series_season', release_year: 2020, mock_service: 'prime', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/635/1587564.jpg' },
+        { id: '26', title: 'Fallout', type: 'series_season', release_year: 2020, mock_service: 'prime', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/599/1499142.jpg' },
+        { id: '27', title: 'Critical Role', type: 'series_season', release_year: 2020, mock_service: 'youtube', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/379/948363.jpg' },
+        { id: '28', title: 'Dimension 20', type: 'series_season', release_year: 2020, mock_service: 'youtube', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/623/1559874.jpg' },
+        { id: '29', title: 'Good Mythical Morning', type: 'series_season', release_year: 2020, mock_service: 'youtube', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/190/476019.jpg' },
+    ];
+}
 
     // Boot
     init();
