@@ -15,7 +15,8 @@
             <span class="domain">tv.seelye.info</span>
         </div>
         <div class="auth-section">
-            <button id="admin-nav-btn" class="btn secondary-btn hidden" style="margin-right: 10px;">Admin</button>
+            <button id="add-shows-btn" class="btn secondary-btn hidden" style="margin-right: 10px;">+ Add Shows</button>
+            <button id="settings-btn" class="btn secondary-btn hidden" style="margin-right: 10px;">Settings</button>
             <span id="auth-status-badge" class="auth-badge">Checking auth...</span>
             <button id="auth-btn" class="btn primary-btn">Login</button>
         </div>
@@ -86,43 +87,67 @@
             <div class="admin-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 15px; margin-bottom: 20px;">
                 <h2 style="margin: 0;">Admin Tools: Add Shows</h2>
                 <button id="close-admin-btn" class="btn secondary-btn" style="background: transparent; color: white; font-size: 1.5rem; padding: 0 10px; border: none;">&times;</button>
-            </div>
+    <!-- Add Shows Modal -->
+    <div id="add-shows-modal" class="modal hidden">
+        <div class="modal-content admin-content">
+            <span class="close-btn" id="close-add-shows-btn">&times;</span>
+            <h2 style="margin-bottom: 20px;">Add Shows to Library</h2>
             
-            <div class="admin-settings-card" id="admin-settings-card">
-                <h3>TMDB Integration</h3>
-                <p>Enter your <strong>API Key (v3 auth)</strong> to enable automated searches and recommendations.</p>
-                <div class="input-group">
-                    <input type="password" id="tmdb-api-key" placeholder="Enter TMDB API Key..." style="width: 100%; max-width: 500px;">
-                    <button id="save-tmdb-key-btn" class="btn primary-btn">Save Key Securely</button>
+            <div class="admin-grid">
+                <!-- TMDB Search -->
+                <div class="admin-card" id="admin-search-card">
+                    <h3>Search TMDB</h3>
+                    <div class="input-group">
+                        <input type="text" id="tmdb-search-query" placeholder="Enter show name...">
+                        <button id="tmdb-search-btn" class="btn primary-btn" style="margin-top: 10px; width: 100%;">Search</button>
+                    </div>
+                    <div id="tmdb-results-grid" class="tmdb-results"></div>
                 </div>
-                <div id="tmdb-key-status" class="status-msg" style="display: none; margin-top: 10px;"></div>
-            </div>
 
-            <div class="admin-settings-card" id="admin-search-card" style="display: none;">
-                <h3>Search TMDB (Official Shows)</h3>
-                <div class="input-group">
-                    <input type="text" id="tmdb-search-query" placeholder="Search for a TV show (e.g. Breaking Bad)..." style="width: 100%;">
-                    <button id="tmdb-search-btn" class="btn primary-btn">Search</button>
-                </div>
-                <div class="tmdb-results-grid" id="tmdb-results-grid" style="margin-top: 20px;">
-                    <!-- JS Injects Results Here -->
+                <!-- Custom Add -->
+                <div class="admin-card">
+                    <h3>Manual Add (e.g., YouTube TV)</h3>
+                    <div class="input-group">
+                        <label>Title</label>
+                        <input type="text" id="custom-title" placeholder="Show Name">
+                    </div>
+                    <div class="input-group">
+                        <label>Poster URL (Optional)</label>
+                        <input type="text" id="custom-poster" placeholder="https://...">
+                    </div>
+                    <div class="input-group">
+                        <label>Service</label>
+                        <select id="custom-service">
+                            <option value="youtube">YouTube TV</option>
+                            <option value="netflix">Netflix</option>
+                            <option value="hulu">Hulu</option>
+                            <option value="disney">Disney+</option>
+                            <option value="peacock">Peacock</option>
+                            <option value="prime">Prime Video</option>
+                        </select>
+                    </div>
+                    <button id="custom-add-btn" class="btn secondary-btn" style="width: 100%;">Add to Library</button>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <div class="admin-settings-card" id="admin-custom-card" style="margin-top: 20px;">
-                <h3>Custom Manual Add (YouTube TV, Web Series, etc)</h3>
-                <p>Add a show that doesn't exist on TMDB.</p>
-                <div class="input-group">
-                    <input type="text" id="custom-title" placeholder="Show Title (e.g. Critical Role)" style="width: 100%; margin-bottom: 10px;">
-                    <input type="url" id="custom-poster" placeholder="Image URL (e.g. https://...)" style="width: 100%; margin-bottom: 10px;">
-                    <select id="custom-service" class="admin-select-dropdown" style="width: 100%; margin-bottom: 10px;">
-                        <option value="">Select Service / Network</option>
-                        <option value="youtube">YouTube / YouTube TV</option>
-                        <option value="netflix">Netflix</option>
-                        <option value="peacock">Peacock</option>
-                        <!-- We will inject more via JS later if needed -->
-                    </select>
-                    <button id="custom-add-btn" class="btn primary-btn" style="width: 100%;">Add to Library</button>
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content admin-content" style="max-width: 600px;">
+            <span class="close-btn" id="close-settings-btn">&times;</span>
+            <h2 style="margin-bottom: 20px;">Settings</h2>
+            
+            <div class="admin-grid" style="grid-template-columns: 1fr;">
+                <!-- System Config -->
+                <div class="admin-card" id="admin-settings-card">
+                    <h3>System Configuration</h3>
+                    <div class="input-group">
+                        <label for="tmdb-api-key">TMDB API Key (Required for Search & Recommendations)</label>
+                        <input type="password" id="tmdb-api-key" placeholder="Enter v3 API Key">
+                    </div>
+                    <button id="save-tmdb-key-btn" class="btn primary-btn">Save Key</button>
+                    <p id="tmdb-key-status" class="status-msg"></p>
                 </div>
             </div>
         </div>

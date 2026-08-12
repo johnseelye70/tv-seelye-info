@@ -47,9 +47,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const recommendationsGrid = document.getElementById('recommendations-grid');
 
     // Admin Elements
-    const adminNavBtn = document.getElementById('admin-nav-btn');
-    const adminModal = document.getElementById('admin-modal');
-    const closeAdminBtn = document.getElementById('close-admin-btn');
+    const addShowsBtn = document.getElementById('add-shows-btn');
+    const settingsBtn = document.getElementById('settings-btn');
+    const addShowsModal = document.getElementById('add-shows-modal');
+    const settingsModal = document.getElementById('settings-modal');
+    const closeAddShowsBtn = document.getElementById('close-add-shows-btn');
+    const closeSettingsBtn = document.getElementById('close-settings-btn');
     const adminSettingsCard = document.getElementById('admin-settings-card');
     const tmdbApiKeyInput = document.getElementById('tmdb-api-key');
     const saveTmdbKeyBtn = document.getElementById('save-tmdb-key-btn');
@@ -107,11 +110,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentUser) {
             authStatusBadge.textContent = currentUser.email;
             authBtn.textContent = 'Logout';
-            adminNavBtn.classList.remove('hidden');
+            addShowsBtn.classList.remove('hidden');
+                settingsBtn.classList.remove('hidden');
         } else {
             authStatusBadge.textContent = 'Guest';
             authBtn.textContent = 'Login';
-            adminNavBtn.classList.add('hidden');
+            addShowsBtn.classList.add('hidden');
+            settingsBtn.classList.add('hidden');
         }
     }
 
@@ -151,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <option value="want_to_watch" ${status === 'want_to_watch' ? 'selected' : ''}>Want to Watch</option>
                             <option value="watching" ${status === 'watching' ? 'selected' : ''}>Watching</option>
                             <option value="completed" ${status === 'completed' ? 'selected' : ''}>Completed</option>
-                            <option value="dropped" ${status === 'dropped' ? 'selected' : ''}>Dropped</option>
+                            <option value="dropped" ${status === 'dropped' ? 'selected' : ''}>Not Interested</option>
                         </select>
             `;
             
@@ -201,9 +206,20 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (allContent.length === 0) {
+            catalogGrid.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; background: rgba(255,255,255,0.05); border-radius: 12px; margin-top: 40px;">
+                    <h2 style="margin-bottom: 15px; font-size: 2rem;">Your Library is Empty!</h2>
+                    <p style="color: var(--text-muted); margin-bottom: 25px; font-size: 1.1rem;">It looks like you haven't added any shows yet. Build your personal watchlist by searching TMDB or manually adding shows from YouTube TV.</p>
+                    <button class="btn primary-btn" style="font-size: 1.2rem; padding: 15px 30px;" onclick="document.getElementById('add-shows-btn').click()">+ Add Your First Show</button>
+                </div>
+            `;
+            return;
+        }
+
         if (filteredContent.length === 0) {
             let reason = searchQuery ? ` matching "${searchQuery}"` : '';
-            catalogGrid.innerHTML = `<p class="skeleton-loader">No library content found${reason}.</p>`;
+            catalogGrid.innerHTML = `<p class="skeleton-loader" style="grid-column: 1 / -1; text-align: center;">No library content found${reason}.</p>`;
             return;
         }
 
@@ -620,39 +636,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Mock Data Fallback ---
-    function getMockData() {
-    return [
-        { id: '1', title: 'The Mandalorian', type: 'series_season', release_year: 2020, mock_service: 'disney', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/501/1253498.jpg' },
-        { id: '2', title: 'The Book of Boba Fett', type: 'series_season', release_year: 2020, mock_service: 'disney', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/501/1253027.jpg' },
-        { id: '3', title: 'Ahsoka', type: 'series_season', release_year: 2020, mock_service: 'disney', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/473/1184972.jpg' },
-        { id: '4', title: 'WandaVision', type: 'series_season', release_year: 2020, mock_service: 'disney', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/295/738028.jpg' },
-        { id: '5', title: 'Loki', type: 'series_season', release_year: 2020, mock_service: 'disney', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/478/1195717.jpg' },
-        { id: '6', title: 'Stranger Things', type: 'series_season', release_year: 2020, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/595/1489169.jpg' },
-        { id: '7', title: 'The Crown', type: 'series_season', release_year: 2020, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/632/1580063.jpg' },
-        { id: '8', title: 'Bridgerton', type: 'series_season', release_year: 2020, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/614/1535959.jpg' },
-        { id: '9', title: 'The Witcher', type: 'series_season', release_year: 2020, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/594/1486674.jpg' },
-        { id: '10', title: 'Squid Game', type: 'series_season', release_year: 2020, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/576/1440521.jpg' },
-        { id: '11', title: 'Ozark', type: 'series_season', release_year: 2020, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/398/996611.jpg' },
-        { id: '12', title: 'The Queen\'s Gambit', type: 'series_season', release_year: 2020, mock_service: 'netflix', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/510/1275203.jpg' },
-        { id: '13', title: 'The Office', type: 'series_season', release_year: 2020, mock_service: 'peacock', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/481/1204342.jpg' },
-        { id: '14', title: 'Parks and Recreation', type: 'series_season', release_year: 2020, mock_service: 'peacock', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/481/1204341.jpg' },
-        { id: '15', title: 'Yellowstone', type: 'series_season', release_year: 2020, mock_service: 'peacock', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/545/1362616.jpg' },
-        { id: '16', title: 'Brooklyn Nine-Nine', type: 'series_season', release_year: 2020, mock_service: 'peacock', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/402/1007484.jpg' },
-        { id: '17', title: 'The Bear', type: 'series_season', release_year: 2020, mock_service: 'hulu', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/629/1574642.jpg' },
-        { id: '18', title: 'Shōgun', type: 'series_season', release_year: 2020, mock_service: 'hulu', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/506/1265637.jpg' },
-        { id: '19', title: 'The Handmaid\'s Tale', type: 'series_season', release_year: 2020, mock_service: 'hulu', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/562/1406667.jpg' },
-        { id: '20', title: 'Only Murders in the Building', type: 'series_season', release_year: 2020, mock_service: 'hulu', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/586/1466415.jpg' },
-        { id: '21', title: 'Fargo', type: 'series_season', release_year: 2020, mock_service: 'hulu', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/487/1219631.jpg' },
-        { id: '22', title: 'The Boys', type: 'series_season', release_year: 2020, mock_service: 'prime', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/619/1547768.jpg' },
-        { id: '23', title: 'Invincible', type: 'series_season', release_year: 2020, mock_service: 'prime', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/618/1545777.jpg' },
-        { id: '24', title: 'The Marvelous Mrs. Maisel', type: 'series_season', release_year: 2020, mock_service: 'prime', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/456/1141825.jpg' },
-        { id: '25', title: 'Reacher', type: 'series_season', release_year: 2020, mock_service: 'prime', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/635/1587564.jpg' },
-        { id: '26', title: 'Fallout', type: 'series_season', release_year: 2020, mock_service: 'prime', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/599/1499142.jpg' },
-        { id: '27', title: 'Critical Role', type: 'series_season', release_year: 2020, mock_service: 'youtube', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/379/948363.jpg' },
-        { id: '28', title: 'Dimension 20', type: 'series_season', release_year: 2020, mock_service: 'youtube', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/623/1559874.jpg' },
-        { id: '29', title: 'Good Mythical Morning', type: 'series_season', release_year: 2020, mock_service: 'youtube', poster_url: 'https://static.tvmaze.com/uploads/images/original_untouched/190/476019.jpg' },
-    ];
-}
+    async function loadData() {
+        try {
+            const { data, error } = await window.db.getLibrary();
+            if (error) {
+                console.error("Error loading library:", error);
+                return;
+            }
+            if (data && data.length > 0) {
+                allContent = data;
+            } else {
+                allContent = [];
+            }
+            renderCatalog();
+            renderContinueWatching();
+            renderRecommendations();
+        } catch (e) {  }
+    }
 
     // Boot
     init();
