@@ -229,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Only fetch recommendations for the last 3 liked shows to prevent API spam
         for (const tmdbId of thumbsUpIds.slice(0, 3)) {
             try {
-                const res = await fetch(\`https://api.themoviedb.org/3/tv/\${tmdbId}/recommendations?api_key=\${cloudKey}&language=en-US&page=1\`);
+                const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/recommendations?api_key=${cloudKey}&language=en-US&page=1`);
                 const data = await res.json();
                 if(data.results) {
                     allRecs = allRecs.concat(data.results);
@@ -250,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     id: String(rec.id),
                     title: rec.name,
                     release_year: rec.first_air_date ? rec.first_air_date.split('-')[0] : 'N/A',
-                    poster_url: rec.poster_path ? \`https://image.tmdb.org/t/p/w500\${rec.poster_path}\` : null,
+                    poster_url: rec.poster_path ? `https://image.tmdb.org/t/p/w500${rec.poster_path}` : null,
                     mock_service: 'Recommended'
                 });
             }
@@ -396,14 +396,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isLoginMode) {
                 const { error } = await window.db.login(email, password);
                 if (error) loginError.textContent = error.message;
-                else loginModal.classList.add('hidden');
+                else {
+                    loginModal.classList.add('hidden');
+                    loginForm.reset();
+                }
             } else {
                 const { data, error } = await window.db.signup(email, password);
                 if (error) loginError.textContent = error.message;
                 else if (data.session === null) {
                     loginSuccess.textContent = 'Check your email to confirm.';
                     loginSuccess.style.display = 'block';
-                } else loginModal.classList.add('hidden');
+                } else {
+                    loginModal.classList.add('hidden');
+                    loginForm.reset();
+                }
             }
         });
 
@@ -462,7 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             tmdbSearchBtn.textContent = 'Searching...';
             try {
-                const res = await fetch(\`https://api.themoviedb.org/3/search/tv?api_key=\${key}&query=\${encodeURIComponent(query)}\`);
+                const res = await fetch(`https://api.themoviedb.org/3/search/tv?api_key=${key}&query=${encodeURIComponent(query)}`);
                 const data = await res.json();
                 renderTmdbResults(data.results || []);
             } catch (e) {
@@ -518,30 +524,30 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const serviceOptions = allServices.map(s => \`<option value="\${s.id}">\${s.name}</option>\`).join('');
+        const serviceOptions = allServices.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
 
         results.slice(0, 12).forEach(item => {
-            const poster = item.poster_path ? \`https://image.tmdb.org/t/p/w500\${item.poster_path}\` : 'https://via.placeholder.com/300x450/111111/fff?text=No+Image';
+            const poster = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/300x450/111111/fff?text=No+Image';
             const year = item.first_air_date ? item.first_air_date.split('-')[0] : 'TBA';
             
             const card = document.createElement('div');
             card.className = 'tmdb-result-card';
-            card.innerHTML = \`
-                <img src="\${poster}" class="tmdb-poster" alt="\${item.name}">
+            card.innerHTML = `
+                <img src="${poster}" class="tmdb-poster" alt="${item.name}">
                 <div class="tmdb-info">
-                    <div class="tmdb-title">\${item.name}</div>
-                    <div class="tmdb-year">\${year}</div>
+                    <div class="tmdb-title">${item.name}</div>
+                    <div class="tmdb-year">${year}</div>
                     
                     <label style="font-size: 0.8rem; margin-top: 10px;">Service</label>
-                    <select class="admin-select-dropdown" id="service-\${item.id}">
+                    <select class="admin-select-dropdown" id="service-${item.id}">
                         <option value="">None / Unknown</option>
-                        \${serviceOptions}
+                        ${serviceOptions}
                         <option value="youtube">YouTube TV</option>
                     </select>
 
-                    <button class="btn primary-btn add-supabase-btn" style="margin-top: 10px; width: 100%;" data-tmdb-id="\${item.id}" data-title="\${item.name.replace(/"/g, '&quot;')}" data-year="\${year}" data-poster="\${poster}">Add to Library</button>
+                    <button class="btn primary-btn add-supabase-btn" style="margin-top: 10px; width: 100%;" data-tmdb-id="${item.id}" data-title="${item.name.replace(/"/g, '&quot;')}" data-year="${year}" data-poster="${poster}">Add to Library</button>
                 </div>
-            \`;
+            `;
             tmdbResultsGrid.appendChild(card);
         });
 
@@ -553,7 +559,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const year = btnEl.dataset.year;
                 const poster = btnEl.dataset.poster;
 
-                const serviceSelect = document.getElementById(\`service-\${tmdbId}\`);
+                const serviceSelect = document.getElementById(`service-${tmdbId}`);
                 const serviceId = serviceSelect.value;
                 const serviceName = serviceSelect.options[serviceSelect.selectedIndex].text;
 
