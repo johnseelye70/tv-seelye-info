@@ -114,31 +114,37 @@ a { color: var(--accent-color); text-decoration: none; }
     gap: 2rem;
 }
 
-/* --- Hero Section (Next Up) --- */
-.next-up-section h2 {
-    margin-bottom: 1rem;
+/* --- Horizontal Scroll Carousels --- */
+.horizontal-scroll-section h2 {
+    font-size: 1.5rem;
 }
 
-.next-up-card {
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--accent-color);
-    border-radius: var(--border-radius);
-    padding: 2rem;
-    box-shadow: var(--shadow-main);
-    display: flex;
-    gap: 2rem;
-    align-items: center;
+.horizontal-scroll-grid {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-active) var(--bg-primary);
 }
 
-.next-up-details h3 {
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
-    color: var(--accent-color);
+.horizontal-scroll-grid::-webkit-scrollbar {
+    height: 8px;
 }
 
-.next-up-details p {
-    color: var(--text-muted);
-    margin-bottom: 1rem;
+.horizontal-scroll-grid::-webkit-scrollbar-track {
+    background: var(--bg-primary); 
+}
+
+.horizontal-scroll-grid::-webkit-scrollbar-thumb {
+    background: var(--border-active); 
+    border-radius: 4px;
+}
+
+.horizontal-scroll-grid .content-card {
+    min-width: 220px;
+    max-width: 220px;
+    flex-shrink: 0;
+}
+
+.horizontal-scroll-grid .card-poster {
+    height: 330px;
 }
 
 /* --- Filters --- */
@@ -260,28 +266,63 @@ a { color: var(--accent-color); text-decoration: none; }
     border-top: 1px solid var(--border-subtle);
 }
 
-.checkbox-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
+.status-dropdown {
+    width: 100%;
+    padding: 0.5rem;
+    background-color: var(--bg-primary);
+    color: var(--text-main);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
 }
 
-.checkbox-wrapper input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
+.status-dropdown:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+.rating-bar {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.rating-btn {
+    flex: 1;
+    padding: 0.25rem;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    color: var(--text-muted);
     cursor: pointer;
-    accent-color: var(--accent-color);
+    font-size: 1.2rem;
+    transition: all var(--transition-fast);
+}
+
+.rating-btn:hover {
+    background-color: var(--bg-secondary);
+}
+
+.rating-btn.active.up {
+    color: var(--success-color);
+    border-color: var(--success-color);
+    background-color: rgba(16, 185, 129, 0.1);
+}
+
+.rating-btn.active.down {
+    color: #ef4444;
+    border-color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.1);
 }
 
 /* Completed State styling */
 .content-card.completed {
-    opacity: 0.6;
-    filter: grayscale(0.5);
+    opacity: 0.7;
 }
-.content-card.completed:hover {
-    opacity: 1;
-    filter: none;
+
+.content-card.dropped {
+    opacity: 0.5;
+    filter: grayscale(0.8);
 }
 
 /* --- Modals --- */

@@ -22,26 +22,36 @@
     </header>
 
     <main class="dashboard">
-        <!-- Franchise Next-Up Map Hero Section -->
-        <section class="hero next-up-section" id="next-up-container">
-            <h2>Chronological Next Up</h2>
-            <div class="next-up-card" id="next-up-card">
-                <div class="skeleton-loader">Loading your next chronological watch...</div>
+        <!-- Continue Watching Section -->
+        <section class="horizontal-scroll-section" id="continue-watching-container" style="display: none; margin-bottom: 30px;">
+            <h2 style="margin-bottom: 15px;">Continue Watching</h2>
+            <div class="horizontal-scroll-grid" id="continue-watching-grid" style="display: flex; overflow-x: auto; gap: 20px; padding-bottom: 10px;">
+                <!-- JS Injects -->
             </div>
         </section>
 
-        <!-- Service Filter Bar -->
+        <!-- Recommended For You Section -->
+        <section class="horizontal-scroll-section" id="recommendations-container" style="display: none; margin-bottom: 40px;">
+            <h2 style="margin-bottom: 15px;">Recommended for You</h2>
+            <div class="horizontal-scroll-grid" id="recommendations-grid" style="display: flex; overflow-x: auto; gap: 20px; padding-bottom: 10px;">
+                <!-- JS Injects -->
+            </div>
+        </section>
+
+        <!-- My Library / Filters -->
         <section class="filters-section">
-            <div class="filter-bar" id="service-filters">
+            <h2>My Library</h2>
+            <div class="filter-bar" id="service-filters" style="margin-top: 15px;">
                 <button class="pill-btn active" data-service="all">All</button>
                 <button class="pill-btn" data-service="netflix">Netflix</button>
                 <button class="pill-btn" data-service="disney">Disney+</button>
                 <button class="pill-btn" data-service="peacock">Peacock</button>
                 <button class="pill-btn" data-service="hulu">Hulu</button>
                 <button class="pill-btn" data-service="prime">Prime Video</button>
+                <button class="pill-btn" data-service="youtube">YouTube TV</button>
             </div>
-            <div class="search-bar">
-                <input type="text" id="search-input" placeholder="Search shows, movies...">
+            <div class="search-bar" style="margin-top: 15px;">
+                <input type="text" id="search-input" placeholder="Search library...">
             </div>
         </section>
 
@@ -55,16 +65,14 @@
 
     <footer class="site-footer">
         <div class="version-info">
-            <strong>Version: Beta 0.4.1</strong>
+            <strong>Version: Beta 0.5.0</strong>
         </div>
         <div class="changelog">
             <h3>Version History</h3>
             <ul>
+                <li><strong>Beta 0.5.0</strong> - Pivot to Smart Watchlist: Added "Continue Watching", "Recommended For You", Custom YouTube TV additions, and Status Tracking.</li>
                 <li><strong>Beta 0.4.1</strong> - Converted Admin Panel to a clean Modal UI overlay to fix catalog visibility bugs.</li>
-                <li><strong>Beta 0.4.0</strong> - Implemented Cloud System Settings syncing. The TMDB API Key now saves securely to the database and automatically hides the setup screen for all users.</li>
-                <li><strong>Beta 0.3.0</strong> - Added inline Admin Panel with TMDB Search API integration. Replaced Max filter with Peacock.</li>
-                <li><strong>Beta 0.2.0</strong> - Added in-app Sign Up functionality and improved database connection stability.</li>
-                <li><strong>Beta 0.1.0</strong> - Initial release. Deployed vanilla architecture, Supabase integration, and Chronological "Next Up" map.</li>
+                <li><strong>Beta 0.4.0</strong> - Implemented Cloud System Settings syncing.</li>
             </ul>
         </div>
     </footer>
@@ -79,7 +87,7 @@
             
             <div class="admin-settings-card" id="admin-settings-card">
                 <h3>TMDB Integration</h3>
-                <p>Enter your <strong>API Key (v3 auth)</strong> to enable searching. Do not use the long Read Access Token.</p>
+                <p>Enter your <strong>API Key (v3 auth)</strong> to enable automated searches and recommendations.</p>
                 <div class="input-group">
                     <input type="password" id="tmdb-api-key" placeholder="Enter TMDB API Key..." style="width: 100%; max-width: 500px;">
                     <button id="save-tmdb-key-btn" class="btn primary-btn">Save Key Securely</button>
@@ -88,13 +96,30 @@
             </div>
 
             <div class="admin-settings-card" id="admin-search-card" style="display: none;">
-                <h3>Search TMDB</h3>
+                <h3>Search TMDB (Official Shows)</h3>
                 <div class="input-group">
                     <input type="text" id="tmdb-search-query" placeholder="Search for a TV show (e.g. Breaking Bad)..." style="width: 100%;">
                     <button id="tmdb-search-btn" class="btn primary-btn">Search</button>
                 </div>
                 <div class="tmdb-results-grid" id="tmdb-results-grid" style="margin-top: 20px;">
                     <!-- JS Injects Results Here -->
+                </div>
+            </div>
+
+            <div class="admin-settings-card" id="admin-custom-card" style="margin-top: 20px;">
+                <h3>Custom Manual Add (YouTube TV, Web Series, etc)</h3>
+                <p>Add a show that doesn't exist on TMDB.</p>
+                <div class="input-group">
+                    <input type="text" id="custom-title" placeholder="Show Title (e.g. Critical Role)" style="width: 100%; margin-bottom: 10px;">
+                    <input type="url" id="custom-poster" placeholder="Image URL (e.g. https://...)" style="width: 100%; margin-bottom: 10px;">
+                    <select id="custom-service" class="admin-select-dropdown" style="width: 100%; margin-bottom: 10px;">
+                        <option value="">Select Service / Network</option>
+                        <option value="youtube">YouTube / YouTube TV</option>
+                        <option value="netflix">Netflix</option>
+                        <option value="peacock">Peacock</option>
+                        <!-- We will inject more via JS later if needed -->
+                    </select>
+                    <button id="custom-add-btn" class="btn primary-btn" style="width: 100%;">Add to Library</button>
                 </div>
             </div>
         </div>

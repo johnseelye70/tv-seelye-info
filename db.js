@@ -97,7 +97,7 @@ const db = {
     },
 
     // Updates
-    async upsertWatchlistItem(userId, contentItemId, status) {
+    async upsertWatchlistItem(userId, contentItemId, status, rating = null) {
         if (!userId) return { error: new Error('User not logged in') };
         
         const { data, error } = await supabaseClient
@@ -106,6 +106,7 @@ const db = {
                 user_id: userId, 
                 content_item_id: contentItemId, 
                 status: status,
+                rating: rating,
                 updated_at: new Date().toISOString()
             }, { onConflict: 'user_id,content_item_id' })
             .select();
