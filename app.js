@@ -90,72 +90,215 @@ document.addEventListener('DOMContentLoaded', () => {
         appletv: { name: 'Apple TV+', networkId: '2552' }
     };
 
-    // Curated Metadata & Genre Mapping for Smart Recommendation Analysis
+    // --- Smart Multi-Vector Recommendation Engine & Heuristics ---
+    function inferGenresFromTitleAndOverview(title = '', overview = '') {
+        const text = (title + ' ' + overview).toLowerCase();
+        const detected = [];
+        if (/space|star|sci-fi|alien|planet|future|tech|cyborg|quantum|supernatural|robot|multiverse|magic|jedi/.test(text)) detected.push("Sci-Fi & Fantasy");
+        if (/detective|police|crime|cartel|murder|kill|investigat|drugs|fbi|mafia|lawyer|gang/.test(text)) detected.push("Crime");
+        if (/funny|laugh|comedy|sitcom|satire|humor|sketch|parody/.test(text)) detected.push("Comedy");
+        if (/mystery|secret|vanish|disappear|puzzle|conspiracy|island|smoke/.test(text)) detected.push("Mystery");
+        if (/action|hero|mission|war|fight|soldier|spy|agent|battle|superhero/.test(text)) detected.push("Action & Adventure");
+        if (/animated|cartoon|anime/.test(text)) detected.push("Animation");
+        if (/history|period|regency|monarch|queen|king|emperor|samurai/.test(text)) detected.push("History");
+        if (detected.length === 0) detected.push("Drama");
+        return detected;
+    }
+
+    // Curated Metadata & Strict Category / Tone Mapping for Smart Recommendation Analysis
     const SHOW_METADATA = {
-        "66732": { genres: ["Sci-Fi & Fantasy", "Drama", "Mystery"], rating: 8.6, tags: ["supernatural", "80s", "monsters"] },
-        "93405": { genres: ["Drama", "Mystery", "Action & Adventure"], rating: 8.4, tags: ["survival", "thriller", "dark"] },
-        "119051": { genres: ["Comedy", "Sci-Fi & Fantasy", "Mystery"], rating: 8.1, tags: ["supernatural", "high school", "goth"] },
-        "65494": { genres: ["Drama", "History"], rating: 8.6, tags: ["royalty", "politics", "biography"] },
-        "69740": { genres: ["Crime", "Drama", "Mystery"], rating: 8.5, tags: ["money laundering", "cartel", "family"] },
-        "87739": { genres: ["Drama"], rating: 8.5, tags: ["chess", "prodigy", "addiction"] },
-        "42009": { genres: ["Sci-Fi & Fantasy", "Drama", "Mystery"], rating: 8.7, tags: ["technology", "dystopia", "anthology"] },
-        "91239": { genres: ["Drama", "Romance"], rating: 8.2, tags: ["regency", "period", "romance"] },
-        "76479": { genres: ["Action & Adventure", "Sci-Fi & Fantasy", "Drama"], rating: 8.0, tags: ["monsters", "magic", "fantasy"] },
-        "1399": { genres: ["Drama", "Crime", "Thriller"], rating: 9.5, tags: ["chemistry", "cartel", "masterpiece"] },
-        "82856": { genres: ["Sci-Fi & Fantasy", "Action & Adventure"], rating: 8.5, tags: ["star wars", "space", "bounty hunter"] },
-        "85271": { genres: ["Sci-Fi & Fantasy", "Action & Adventure"], rating: 8.2, tags: ["marvel", "time travel", "multiverse"] },
-        "85937": { genres: ["Sci-Fi & Fantasy", "Mystery", "Drama"], rating: 8.2, tags: ["marvel", "sitcom", "magic"] },
-        "83867": { genres: ["Sci-Fi & Fantasy", "Action & Adventure", "Drama"], rating: 8.4, tags: ["star wars", "rebellion", "spy"] },
-        "67070": { genres: ["Animation", "Kids", "Comedy"], rating: 9.0, tags: ["family", "wholesome", "parenting"] },
-        "1404": { genres: ["Action & Adventure", "Sci-Fi & Fantasy", "Drama"], rating: 8.4, tags: ["marvel", "superhero", "gritty"] },
-        "63247": { genres: ["Animation", "Sci-Fi & Fantasy", "Action & Adventure"], rating: 8.4, tags: ["star wars", "jedi", "animation"] },
-        "108978": { genres: ["Action & Adventure", "Sci-Fi & Fantasy", "Comedy"], rating: 7.7, tags: ["marvel", "archer", "holiday"] },
-        "57243": { genres: ["Sci-Fi & Fantasy", "Action & Adventure", "Drama"], rating: 7.3, tags: ["superhero", "marvel", "shield"] },
-        "124364": { genres: ["Comedy", "Drama"], rating: 8.5, tags: ["kitchen", "family", "chicago", "culinary"] },
-        "126308": { genres: ["Drama", "Action & Adventure", "History"], rating: 8.5, tags: ["japan", "samurai", "epic"] },
-        "79242": { genres: ["Comedy", "Crime", "Mystery"], rating: 8.4, tags: ["podcast", "nyc", "murder"] },
-        "70523": { genres: ["Drama", "Sci-Fi & Fantasy"], rating: 8.2, tags: ["dystopia", "totalitarian", "rebirth"] },
-        "60059": { genres: ["Crime", "Drama", "Mystery"], rating: 8.9, tags: ["anthology", "midwest", "coen"] },
-        "1433": { genres: ["Animation", "Comedy"], rating: 7.9, tags: ["cartoon", "humor", "family"] },
-        "2710": { genres: ["Comedy"], rating: 8.8, tags: ["philly", "gang", "bar", "satire"] },
-        "83631": { genres: ["Comedy", "Sci-Fi & Fantasy"], rating: 8.5, tags: ["vampires", "staten island", "mockumentary"] },
-        "1400": { genres: ["Drama"], rating: 8.5, tags: ["advertising", "60s", "nyc"] },
-        "1396": { genres: ["Drama", "Crime", "Mystery"], rating: 8.8, tags: ["drugs", "baltimore", "police", "street"] },
-        "85552": { genres: ["Drama", "Western"], rating: 8.5, tags: ["ranch", "montana", "family empire"] },
-        "106379": { genres: ["Mystery", "Comedy", "Crime"], rating: 7.9, tags: ["lie detector", "case of week", "columbo"] },
-        "1418": { genres: ["Comedy"], rating: 8.6, tags: ["dunder mifflin", "mockumentary", "workplace"] },
-        "46896": { genres: ["Comedy", "Crime"], rating: 8.5, tags: ["police", "detective", "99th precinct"] },
-        "8592": { genres: ["Comedy"], rating: 8.5, tags: ["pawnee", "government", "waffles"] },
-        "2190": { genres: ["Sci-Fi & Fantasy", "Drama"], rating: 8.3, tags: ["space", "cylons", "fleet"] },
-        "1405": { genres: ["Crime", "Drama", "Mystery"], rating: 8.2, tags: ["miami", "serial killer", "blood"] },
-        "1416": { genres: ["Drama"], rating: 8.3, tags: ["hospital", "doctors", "seattle"] },
-        "76479_prime": { genres: ["Sci-Fi & Fantasy", "Action & Adventure"], rating: 8.5, tags: ["superheroes", "antihero", "vought"] },
-        "92749": { genres: ["Drama", "Action & Adventure", "Crime"], rating: 8.1, tags: ["army", "drifter", "investigator"] },
-        "106379_fallout": { genres: ["Sci-Fi & Fantasy", "Action & Adventure"], rating: 8.4, tags: ["post apocalyptic", "vault", "wasteland"] },
-        "71914": { genres: ["Sci-Fi & Fantasy", "Action & Adventure"], rating: 7.7, tags: ["magic", "channeler", "epic"] },
-        "60574": { genres: ["Drama", "Crime", "Mystery"], rating: 8.5, tags: ["lapd", "detective", "hollywood"] },
-        "74204": { genres: ["Comedy", "Drama"], rating: 8.7, tags: ["standup", "50s", "nyc", "comedy"] },
-        "84773": { genres: ["Animation", "Action & Adventure", "Sci-Fi & Fantasy"], rating: 8.7, tags: ["superhero", "omni man", "graphic"] },
-        "67178": { genres: ["Sci-Fi & Fantasy", "Action & Adventure", "Drama"], rating: 8.5, tags: ["space", "politics", "ring"] },
-        "73586": { genres: ["Drama", "Action & Adventure"], rating: 8.0, tags: ["cia", "analyst", "action"] },
-        "76331": { genres: ["Sci-Fi & Fantasy", "Action & Adventure"], rating: 6.9, tags: ["middle earth", "elves", "sauron"] },
-        "1911": { genres: ["Sci-Fi & Fantasy", "Drama", "Mystery"], rating: 8.3, tags: ["island", "smoke monster", "mystery", "plane crash"] },
-        "1402": { genres: ["Drama", "Sci-Fi & Fantasy"], rating: 8.3, tags: ["zombies", "survival", "apocalypse"] },
-        "65701": { genres: ["Comedy", "Talk"], rating: 8.0, tags: ["rhett and link", "games", "internet"] },
-        "1667": { genres: ["Comedy"], rating: 7.0, tags: ["sketch", "live", "comedy"] },
-        "60625": { genres: ["Animation", "Sci-Fi & Fantasy", "Comedy"], rating: 8.7, tags: ["multiverse", "scientist", "portal"] },
-        "2912": { genres: ["News", "Family"], rating: 7.5, tags: ["trivia", "quiz", "game show"] },
-        "97546": { genres: ["Comedy", "Drama"], rating: 8.4, tags: ["soccer", "feel good", "wholesome", "coach"] },
-        "95396": { genres: ["Sci-Fi & Fantasy", "Drama", "Mystery"], rating: 8.4, tags: ["workplace", "dystopia", "thriller", "corporate"] },
-        "125988": { genres: ["Sci-Fi & Fantasy", "Drama"], rating: 8.2, tags: ["underground", "dystopia", "post-apocalypse", "survival"] },
-        "95480": { genres: ["Drama", "Crime", "Thriller"], rating: 8.0, tags: ["spy", "mi5", "london", "slough house"] },
-        "90282": { genres: ["Drama"], rating: 7.7, tags: ["broadcast", "news", "journalism", "metoo"] },
-        "87917": { genres: ["Sci-Fi & Fantasy", "Drama"], rating: 7.7, tags: ["space", "nasa", "alternate history", "cold war"] },
-        "93740": { genres: ["Sci-Fi & Fantasy", "Drama"], rating: 7.7, tags: ["space", "asimov", "galactic empire", "math"] },
-        "136311": { genres: ["Comedy", "Drama"], rating: 7.8, tags: ["therapy", "grief", "friendship", "psychology"] },
-        "155537": { genres: ["Drama", "Crime"], rating: 8.1, tags: ["prison", "fbi", "true crime", "serial killer"] },
-        "87784": { genres: ["Drama", "Mystery", "Crime"], rating: 8.2, tags: ["lawyer", "murder", "trial", "family"] }
+        // --- NETFLIX ---
+        '66732': { title: 'Stranger Things', primaryCategory: 'dark_mystery_supernatural', tone: 'dark', genres: ['Sci-Fi & Fantasy', 'Mystery', 'Drama'], rating: 8.6, tags: ['supernatural', '80s', 'monsters', 'upside down'] },
+        '93405': { title: 'Squid Game', primaryCategory: 'action_thriller', tone: 'dark', genres: ['Action & Adventure', 'Drama', 'Mystery'], rating: 8.4, tags: ['survival', 'thriller', 'dark', 'high stakes'] },
+        '119051': { title: 'Wednesday', primaryCategory: 'dark_mystery_supernatural', tone: 'dark', genres: ['Mystery', 'Sci-Fi & Fantasy'], rating: 8.1, tags: ['supernatural', 'goth', 'macabre', 'high school', 'monsters'] },
+        '65494': { title: 'The Crown', primaryCategory: 'prestige_drama', tone: 'serious', genres: ['Drama', 'History'], rating: 8.6, tags: ['royalty', 'politics', 'biography', 'british'] },
+        '69740': { title: 'Ozark', primaryCategory: 'gritty_crime', tone: 'dark', genres: ['Crime', 'Drama', 'Thriller'], rating: 8.5, tags: ['money laundering', 'cartel', 'family', 'gritty'] },
+        '87739': { title: "The Queen's Gambit", primaryCategory: 'prestige_drama', tone: 'serious', genres: ['Drama'], rating: 8.5, tags: ['chess', 'prodigy', 'period', 'addiction'] },
+        '42009': { title: 'Black Mirror', primaryCategory: 'mindbending_scifi', tone: 'dark', genres: ['Sci-Fi & Fantasy', 'Drama', 'Mystery'], rating: 8.7, tags: ['technology', 'dystopia', 'anthology', 'dark future'] },
+        '91239': { title: 'Bridgerton', primaryCategory: 'prestige_drama', tone: 'warm', genres: ['Drama', 'Romance'], rating: 8.2, tags: ['regency', 'period', 'romance', 'society'] },
+        '71446': { title: 'Money Heist', primaryCategory: 'action_thriller', tone: 'tense', genres: ['Action & Adventure', 'Crime', 'Drama'], rating: 8.2, tags: ['heist', 'professor', 'hostage', 'suspense'] },
+        '75006': { title: 'The Umbrella Academy', primaryCategory: 'dark_mystery_supernatural', tone: 'dark', genres: ['Sci-Fi & Fantasy', 'Action & Adventure'], rating: 7.9, tags: ['superhero', 'apocalypse', 'time travel', 'dysfunctional'] },
+
+        // --- DISNEY+ ---
+        '82856': { title: 'The Mandalorian', primaryCategory: 'action_thriller', tone: 'adventurous', genres: ['Sci-Fi & Fantasy', 'Action & Adventure'], rating: 8.5, tags: ['star wars', 'space', 'bounty hunter', 'grogu'] },
+        '84958': { title: 'Loki', primaryCategory: 'mindbending_scifi', tone: 'cerebral', genres: ['Sci-Fi & Fantasy', 'Action & Adventure'], rating: 8.2, tags: ['marvel', 'time travel', 'multiverse', 'tva'] },
+        '85271': { title: 'WandaVision', primaryCategory: 'mindbending_scifi', tone: 'cerebral', genres: ['Sci-Fi & Fantasy', 'Mystery', 'Drama'], rating: 8.2, tags: ['marvel', 'sitcom', 'magic', 'reality'] },
+        '83867': { title: 'Andor', primaryCategory: 'action_thriller', tone: 'tense', genres: ['Sci-Fi & Fantasy', 'Action & Adventure', 'Drama'], rating: 8.4, tags: ['star wars', 'rebellion', 'spy', 'gritty'] },
+        '114461': { title: 'Ahsoka', primaryCategory: 'action_thriller', tone: 'adventurous', genres: ['Sci-Fi & Fantasy', 'Action & Adventure'], rating: 7.6, tags: ['star wars', 'jedi', 'lightsaber', 'thrawn'] },
+        '4194': { title: 'Star Wars: The Clone Wars', primaryCategory: 'action_thriller', tone: 'adventurous', genres: ['Animation', 'Sci-Fi & Fantasy', 'Action & Adventure'], rating: 8.4, tags: ['star wars', 'jedi', 'clones', 'galactic'] },
+        '103540': { title: 'Percy Jackson and the Olympians', primaryCategory: 'fantasy_adventure', tone: 'adventurous', genres: ['Action & Adventure', 'Sci-Fi & Fantasy', 'Family'], rating: 7.4, tags: ['mythology', 'greek gods', 'demigod', 'quest'] },
+        '92749': { title: 'Moon Knight', primaryCategory: 'action_thriller', tone: 'dark', genres: ['Action & Adventure', 'Sci-Fi & Fantasy', 'Drama'], rating: 7.3, tags: ['marvel', 'egyptian', 'superhero', 'psychological'] },
+        '456': { title: 'The Simpsons', primaryCategory: 'lighthearted_comedy', tone: 'lighthearted', genres: ['Animation', 'Comedy'], rating: 8.7, tags: ['cartoon', 'springfield', 'family', 'satire'] },
+        '202555': { title: 'Daredevil: Born Again', primaryCategory: 'action_thriller', tone: 'gritty', genres: ['Action & Adventure', 'Crime', 'Drama'], rating: 8.4, tags: ['marvel', 'hells kitchen', 'superhero', 'vigilante'] },
+
+        // --- HULU ---
+        '136315': { title: 'The Bear', primaryCategory: 'satirical_dark_comedy', tone: 'tense', genres: ['Drama', 'Comedy'], rating: 8.6, tags: ['kitchen', 'chicago', 'culinary', 'high stress', 'family'] },
+        '126308': { title: 'Shōgun', primaryCategory: 'prestige_drama', tone: 'epic', genres: ['Drama', 'Action & Adventure', 'History'], rating: 8.7, tags: ['japan', 'samurai', 'feudal', 'epic', 'politics'] },
+        '107113': { title: 'Only Murders in the Building', primaryCategory: 'gritty_crime', tone: 'witty', genres: ['Comedy', 'Crime', 'Mystery'], rating: 8.1, tags: ['podcast', 'nyc', 'murder', 'investigation'] },
+        '69478': { title: "The Handmaid's Tale", primaryCategory: 'prestige_drama', tone: 'dark', genres: ['Drama', 'Sci-Fi & Fantasy'], rating: 8.4, tags: ['dystopia', 'totalitarian', 'gilead', 'resistance'] },
+        '60622': { title: 'Fargo', primaryCategory: 'gritty_crime', tone: 'dark', genres: ['Crime', 'Drama', 'Mystery'], rating: 8.9, tags: ['anthology', 'midwest', 'coen', 'eccentric murder'] },
+        '615': { title: 'Futurama', primaryCategory: 'lighthearted_comedy', tone: 'lighthearted', genres: ['Animation', 'Comedy', 'Sci-Fi & Fantasy'], rating: 8.5, tags: ['future', 'planet express', 'fry', 'bender'] },
+        '64464': { title: '11.22.63', primaryCategory: 'prestige_drama', tone: 'tense', genres: ['Drama', 'Mystery', 'Sci-Fi & Fantasy'], rating: 8.1, tags: ['stephen king', 'time travel', 'jfk', 'assassination'] },
+        '125935': { title: 'Abbott Elementary', primaryCategory: 'lighthearted_comedy', tone: 'lighthearted', genres: ['Comedy'], rating: 8.2, tags: ['mockumentary', 'teachers', 'school', 'philadelphia', 'wholesome'] },
+        '82883': { title: 'The Act', primaryCategory: 'prestige_drama', tone: 'dark', genres: ['Crime', 'Drama'], rating: 7.9, tags: ['true crime', 'munchausen', 'gypsy rose', 'psychological'] },
+        '110695': { title: 'Dopesick', primaryCategory: 'prestige_drama', tone: 'serious', genres: ['Drama'], rating: 8.6, tags: ['opioid', 'big pharma', 'purdue', 'addiction', 'investigation'] },
+
+        // --- PEACOCK ---
+        '2316': { title: 'The Office', primaryCategory: 'lighthearted_comedy', tone: 'lighthearted', genres: ['Comedy'], rating: 8.9, tags: ['dunder mifflin', 'mockumentary', 'workplace', 'sitcom', 'scranton'] },
+        '8592': { title: 'Parks and Recreation', primaryCategory: 'lighthearted_comedy', tone: 'lighthearted', genres: ['Comedy'], rating: 8.6, tags: ['pawnee', 'mockumentary', 'government', 'waffles', 'wholesome'] },
+        '73586': { title: 'Yellowstone', primaryCategory: 'prestige_drama', tone: 'serious', genres: ['Drama', 'Western'], rating: 8.6, tags: ['dutton', 'montana', 'ranch', 'family empire'] },
+        '120998': { title: 'Poker Face', primaryCategory: 'gritty_crime', tone: 'witty', genres: ['Mystery', 'Comedy', 'Crime'], rating: 7.9, tags: ['columbo', 'case of week', 'lie detector', 'road trip'] },
+        '48891': { title: 'Brooklyn Nine-Nine', primaryCategory: 'lighthearted_comedy', tone: 'lighthearted', genres: ['Comedy', 'Crime'], rating: 8.4, tags: ['police', 'detective', '99th precinct', 'sitcom', 'jake peralta'] },
+        '37680': { title: 'Suits', primaryCategory: 'prestige_drama', tone: 'witty', genres: ['Drama'], rating: 8.5, tags: ['lawyers', 'manhattan', 'corporate', 'courtroom'] },
+        '201834': { title: 'ted', primaryCategory: 'satirical_dark_comedy', tone: 'satirical', genres: ['Comedy'], rating: 7.9, tags: ['teddy bear', 'seth macfarlane', '90s', 'raunchy'] },
+        '4608': { title: '30 Rock', primaryCategory: 'lighthearted_comedy', tone: 'lighthearted', genres: ['Comedy'], rating: 8.3, tags: ['nbc', 'sketch show', 'tina fey', 'satire', 'workplace'] },
+
+        // --- PRIME VIDEO ---
+        '76479': { title: 'The Boys', primaryCategory: 'action_thriller', tone: 'gritty', genres: ['Action & Adventure', 'Sci-Fi & Fantasy'], rating: 8.7, tags: ['superheroes', 'antihero', 'vought', 'homelander', 'satire'] },
+        '106379': { title: 'Fallout', primaryCategory: 'mindbending_scifi', tone: 'gritty', genres: ['Sci-Fi & Fantasy', 'Action & Adventure'], rating: 8.4, tags: ['post-apocalyptic', 'vault', 'wasteland', 'ghoul'] },
+        '108978': { title: 'Reacher', primaryCategory: 'action_thriller', tone: 'tense', genres: ['Action & Adventure', 'Crime', 'Drama'], rating: 8.1, tags: ['jack reacher', 'army investigator', 'combat', 'action'] },
+        '95557': { title: 'INVINCIBLE', primaryCategory: 'action_thriller', tone: 'dark', genres: ['Animation', 'Action & Adventure', 'Sci-Fi & Fantasy'], rating: 8.7, tags: ['superhero', 'omni man', 'graphic', 'comics'] },
+        '70796': { title: 'The Marvelous Mrs. Maisel', primaryCategory: 'prestige_drama', tone: 'witty', genres: ['Comedy', 'Drama'], rating: 8.7, tags: ['standup', '50s', 'nyc', 'period', 'midge'] },
+        '84773': { title: 'The Lord of the Rings: The Rings of Power', primaryCategory: 'fantasy_adventure', tone: 'epic', genres: ['Sci-Fi & Fantasy', 'Action & Adventure'], rating: 6.9, tags: ['middle earth', 'sauron', 'galadriel', 'tolkien', 'elves'] },
+        '63639': { title: 'The Expanse', primaryCategory: 'mindbending_scifi', tone: 'cerebral', genres: ['Sci-Fi & Fantasy', 'Drama'], rating: 8.5, tags: ['space', 'politics', 'ring gates', 'sol system', 'hard scifi'] },
+        '67070': { title: 'Fleabag', primaryCategory: 'satirical_dark_comedy', tone: 'satirical', genres: ['Comedy', 'Drama'], rating: 8.7, tags: ['fourth wall', 'london', 'dark humor', 'grief', 'phoebe waller-bridge'] },
+
+        // --- YOUTUBE ---
+        '254002': { title: 'Critical Role', primaryCategory: 'fantasy_adventure', tone: 'adventurous', genres: ['Action & Adventure', 'Sci-Fi & Fantasy'], rating: 8.8, tags: ['dnd', 'voice actors', 'campaign', 'ttrpg'] },
+        '89180': { title: 'Dimension 20', primaryCategory: 'fantasy_adventure', tone: 'adventurous', genres: ['Comedy', 'Sci-Fi & Fantasy'], rating: 8.6, tags: ['dnd', 'brennan lee mulligan', 'improv', 'ttrpg'] },
+        '65701': { title: 'Good Mythical Morning', primaryCategory: 'lighthearted_comedy', tone: 'lighthearted', genres: ['Comedy', 'Talk'], rating: 8.0, tags: ['rhett and link', 'taste test', 'fun', 'youtube'] },
+        '1667': { title: 'Saturday Night Live', primaryCategory: 'lighthearted_comedy', tone: 'lighthearted', genres: ['Comedy'], rating: 7.0, tags: ['sketch', 'live comedy', 'nbc', 'parody'] },
+        '60625': { title: 'Rick and Morty', primaryCategory: 'satirical_dark_comedy', tone: 'satirical', genres: ['Animation', 'Comedy', 'Sci-Fi & Fantasy'], rating: 8.7, tags: ['multiverse', 'cynical', 'portal gun', 'mad scientist'] },
+        '2912': { title: 'Jeopardy!', primaryCategory: 'lighthearted_comedy', tone: 'lighthearted', genres: ['Family', 'Comedy'], rating: 8.2, tags: ['trivia', 'quiz show', 'knowledge', 'comfort'] },
+
+        // --- APPLE TV+ ---
+        '97546': { title: 'Ted Lasso', primaryCategory: 'lighthearted_comedy', tone: 'wholesome', genres: ['Comedy', 'Drama'], rating: 8.8, tags: ['afc richmond', 'soccer', 'wholesome', 'feel-good', 'coach'] },
+        '95396': { title: 'Severance', primaryCategory: 'mindbending_scifi', tone: 'cerebral', genres: ['Sci-Fi & Fantasy', 'Drama', 'Mystery'], rating: 8.7, tags: ['lumon', 'workplace', 'dystopia', 'psychological', 'mystery'] },
+        '125988': { title: 'Silo', primaryCategory: 'mindbending_scifi', tone: 'tense', genres: ['Sci-Fi & Fantasy', 'Drama'], rating: 8.1, tags: ['underground', 'dystopia', 'post-apocalypse', 'secrets'] },
+        '95480': { title: 'Slow Horses', primaryCategory: 'gritty_crime', tone: 'gritty', genres: ['Drama', 'Crime', 'Thriller'], rating: 8.2, tags: ['mi5', 'slough house', 'jackson lamb', 'espionage', 'british'] },
+        '90282': { title: 'The Morning Show', primaryCategory: 'prestige_drama', tone: 'serious', genres: ['Drama'], rating: 8.2, tags: ['broadcast', 'news', 'journalism', 'corporate', 'metoo'] },
+        '87917': { title: 'For All Mankind', primaryCategory: 'mindbending_scifi', tone: 'cerebral', genres: ['Sci-Fi & Fantasy', 'Drama'], rating: 8.1, tags: ['nasa', 'alternate history', 'space race', 'moon base'] },
+        '93740': { title: 'Foundation', primaryCategory: 'mindbending_scifi', tone: 'epic', genres: ['Sci-Fi & Fantasy', 'Drama'], rating: 7.6, tags: ['asimov', 'galactic empire', 'psychohistory', 'space'] },
+        '136311': { title: 'Shrinking', primaryCategory: 'lighthearted_comedy', tone: 'warm', genres: ['Comedy', 'Drama'], rating: 8.0, tags: ['therapy', 'grief', 'friendship', 'wholesome', 'jason segel'] },
+        '155537': { title: 'Black Bird', primaryCategory: 'prestige_drama', tone: 'dark', genres: ['Drama', 'Crime'], rating: 8.1, tags: ['prison', 'fbi', 'serial killer', 'true crime', 'interrogation'] },
+        '87784': { title: 'Defending Jacob', primaryCategory: 'prestige_drama', tone: 'serious', genres: ['Drama', 'Mystery', 'Crime'], rating: 7.9, tags: ['murder trial', 'family', 'district attorney', 'courtroom'] },
+
+        // --- LEGACY & TMDB POPULAR ALIASES ---
+        '1418': { title: 'The Office', primaryCategory: 'lighthearted_comedy', tone: 'lighthearted', genres: ['Comedy'], rating: 8.9, tags: ['dunder mifflin', 'mockumentary', 'workplace', 'sitcom'] },
+        '46896': { title: 'Brooklyn Nine-Nine', primaryCategory: 'lighthearted_comedy', tone: 'lighthearted', genres: ['Comedy', 'Crime'], rating: 8.4, tags: ['police', 'detective', '99th precinct'] },
+        '124364': { title: 'The Bear', primaryCategory: 'satirical_dark_comedy', tone: 'tense', genres: ['Drama', 'Comedy'], rating: 8.6, tags: ['kitchen', 'chicago', 'culinary'] },
+        '79242': { title: 'Only Murders in the Building', primaryCategory: 'gritty_crime', tone: 'witty', genres: ['Comedy', 'Crime', 'Mystery'], rating: 8.1, tags: ['podcast', 'nyc', 'murder'] },
+        '60059': { title: 'Fargo', primaryCategory: 'gritty_crime', tone: 'dark', genres: ['Crime', 'Drama', 'Mystery'], rating: 8.9, tags: ['anthology', 'midwest', 'coen'] },
+        '1399': { title: 'Breaking Bad', primaryCategory: 'prestige_drama', tone: 'dark', genres: ['Drama', 'Crime', 'Thriller'], rating: 9.5, tags: ['chemistry', 'cartel', 'masterpiece', 'walter white'] },
+        '1400': { title: 'Mad Men', primaryCategory: 'prestige_drama', tone: 'serious', genres: ['Drama'], rating: 8.5, tags: ['advertising', '60s', 'nyc', 'don draper'] },
+        '1396': { title: 'The Wire', primaryCategory: 'gritty_crime', tone: 'dark', genres: ['Drama', 'Crime', 'Mystery'], rating: 8.8, tags: ['drugs', 'baltimore', 'police', 'street'] },
+        '1405': { title: 'Dexter', primaryCategory: 'gritty_crime', tone: 'dark', genres: ['Crime', 'Drama', 'Mystery'], rating: 8.2, tags: ['miami', 'serial killer', 'blood', 'forensics'] },
+        '1402': { title: 'The Walking Dead', primaryCategory: 'action_thriller', tone: 'dark', genres: ['Drama', 'Sci-Fi & Fantasy'], rating: 8.3, tags: ['zombies', 'survival', 'apocalypse'] },
+        '1911': { title: 'Lost', primaryCategory: 'mindbending_scifi', tone: 'cerebral', genres: ['Sci-Fi & Fantasy', 'Drama', 'Mystery'], rating: 8.3, tags: ['island', 'smoke monster', 'mystery', 'plane crash'] },
+        '2710': { title: "It's Always Sunny in Philadelphia", primaryCategory: 'satirical_dark_comedy', tone: 'satirical', genres: ['Comedy'], rating: 8.8, tags: ['philly', 'gang', 'bar', 'satire'] },
+        '83631': { title: 'What We Do in the Shadows', primaryCategory: 'satirical_dark_comedy', tone: 'satirical', genres: ['Comedy', 'Sci-Fi & Fantasy'], rating: 8.5, tags: ['vampires', 'staten island', 'mockumentary'] },
+        '85552': { title: 'Yellowstone', primaryCategory: 'prestige_drama', tone: 'serious', genres: ['Drama', 'Western'], rating: 8.6, tags: ['ranch', 'montana', 'family empire'] },
+        '1416': { title: "Grey's Anatomy", primaryCategory: 'prestige_drama', tone: 'serious', genres: ['Drama'], rating: 8.3, tags: ['hospital', 'doctors', 'seattle'] }
     };
+
+    function getShowClassification(item) {
+        if (!item) return { primaryCategory: 'prestige_drama', tone: 'serious', genres: ['Drama'], rating: 8.0, tags: [] };
+        const idStr = String(item.id);
+        const tmdbIdStr = String(item.tmdb_id || item.id);
+        if (SHOW_METADATA[tmdbIdStr]) return SHOW_METADATA[tmdbIdStr];
+        if (SHOW_METADATA[idStr]) return SHOW_METADATA[idStr];
+
+        const titleLower = (item.title || '').toLowerCase().trim();
+        if (titleLower) {
+            for (const meta of Object.values(SHOW_METADATA)) {
+                if (meta.title && meta.title.toLowerCase().trim() === titleLower) {
+                    return meta;
+                }
+            }
+        }
+
+        // Dynamic Heuristics for arbitrary TMDB search additions
+        const text = (item.title + ' ' + (item.overview || '')).toLowerCase();
+        const isDark = /dark|murder|serial killer|cartel|gritty|sinister|goth|macabre|horror|dystopia|brutal|blood|death|conspiracy/.test(text);
+        const isSitcom = /sitcom|mockumentary|workplace comedy|hilarious|bickering|funny|laugh|stand-up|quirky/.test(text);
+        const isCrime = /detective|police|cop|fbi|cartel|drugs|mafia|heist|lawyer|investigation|crime/.test(text);
+        const isSciFi = /space|sci-fi|alien|planet|future|quantum|cyborg|supernatural|magic|multiverse|time travel/.test(text);
+        const isAction = /action|combat|battle|soldier|spy|agent|superhero|warrior|assassin|survival/.test(text);
+
+        let primaryCategory = 'prestige_drama';
+        let tone = isDark ? 'dark' : 'serious';
+
+        if (isSitcom && !isDark) {
+            primaryCategory = 'lighthearted_comedy';
+            tone = 'lighthearted';
+        } else if (isDark && (isSitcom || /satire|black comedy/.test(text))) {
+            primaryCategory = 'satirical_dark_comedy';
+            tone = 'satirical';
+        } else if (isDark && isSciFi) {
+            primaryCategory = /supernatural|goth|macabre|vampire|witch/.test(text) ? 'dark_mystery_supernatural' : 'mindbending_scifi';
+            tone = 'dark';
+        } else if (isCrime) {
+            primaryCategory = 'gritty_crime';
+            tone = isDark ? 'dark' : 'serious';
+        } else if (isSciFi) {
+            primaryCategory = 'mindbending_scifi';
+            tone = 'cerebral';
+        } else if (isAction) {
+            primaryCategory = 'action_thriller';
+            tone = isDark ? 'dark' : 'adventurous';
+        }
+
+        return {
+            primaryCategory,
+            tone,
+            genres: inferGenresFromTitleAndOverview(item.title, item.overview),
+            rating: item.vote_average ? Number((item.vote_average).toFixed(1)) : 8.0,
+            tags: []
+        };
+    }
+
+    function checkMoodEligibility(item, mood) {
+        if (!mood) return true;
+        const meta = getShowClassification(item);
+        const cat = meta.primaryCategory;
+        const tone = meta.tone;
+
+        if (mood === 'lighthearted') {
+            // Strictly exclude dark, gritty, tense shows, or dark/action categories
+            if (tone === 'dark' || tone === 'gritty' || tone === 'tense') return false;
+            if (cat === 'dark_mystery_supernatural' || cat === 'prestige_drama' || cat === 'gritty_crime' || cat === 'action_thriller' || cat === 'satirical_dark_comedy') {
+                return false;
+            }
+            return cat === 'lighthearted_comedy';
+        }
+
+        if (mood === 'drama') {
+            // Strictly exclude lighthearted sitcoms, juvenile content, or supernatural teen mysteries
+            if (cat === 'lighthearted_comedy') return false;
+            if (cat === 'dark_mystery_supernatural') return false;
+            if (cat === 'satirical_dark_comedy' && tone !== 'tense' && tone !== 'serious') return false;
+            if (cat === 'prestige_drama') return true;
+            if (cat === 'gritty_crime' && (tone === 'serious' || tone === 'dark' || tone === 'gritty')) return true;
+            return false;
+        }
+
+        if (mood === 'mindbending') {
+            if (cat === 'lighthearted_comedy') return false;
+            return cat === 'mindbending_scifi' || (cat === 'dark_mystery_supernatural' && (tone === 'cerebral' || tone === 'dark'));
+        }
+
+        if (mood === 'adrenaline') {
+            if (cat === 'lighthearted_comedy') return false;
+            return cat === 'action_thriller' || cat === 'fantasy_adventure';
+        }
+
+        if (mood === 'crime') {
+            if (cat === 'lighthearted_comedy') return false;
+            return cat === 'gritty_crime' || (cat === 'prestige_drama' && meta.genres?.includes('Crime'));
+        }
+
+        return true;
+    }
 
     // Admin Elements
     const addShowsBtn = document.getElementById('add-shows-btn');
@@ -1380,20 +1523,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Smart Multi-Vector Recommendation Engine ---
-    function inferGenresFromTitleAndOverview(title = '', overview = '') {
-        const text = (title + ' ' + overview).toLowerCase();
-        const detected = [];
-        if (/space|star|sci-fi|alien|planet|future|tech|cyborg|quantum|supernatural|robot|multiverse|magic|jedi/.test(text)) detected.push("Sci-Fi & Fantasy");
-        if (/detective|police|crime|cartel|murder|kill|investigat|drugs|fbi|mafia|lawyer|gang/.test(text)) detected.push("Crime");
-        if (/funny|laugh|comedy|sitcom|satire|humor|sketch|parody/.test(text)) detected.push("Comedy");
-        if (/mystery|secret|vanish|disappear|puzzle|conspiracy|island|smoke/.test(text)) detected.push("Mystery");
-        if (/action|hero|mission|war|fight|soldier|spy|agent|battle|superhero/.test(text)) detected.push("Action & Adventure");
-        if (/animated|cartoon|anime/.test(text)) detected.push("Animation");
-        if (/history|period|regency|monarch|queen|king|emperor|samurai/.test(text)) detected.push("History");
-        if (detected.length === 0) detected.push("Drama");
-        return detected;
-    }
-
     function computeTasteProfile() {
         const genreScores = {};
         const serviceCounts = {};
@@ -1433,12 +1562,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // Map genres from SHOW_METADATA or keyword heuristics
-            const meta = SHOW_METADATA[tmdbIdStr] || SHOW_METADATA[idStr];
-            let genres = meta?.genres;
-            if (!genres) {
-                genres = inferGenresFromTitleAndOverview(item.title, item.overview || '');
-            }
+            // Map genres and classification
+            const meta = getShowClassification(item);
+            const genres = meta.genres || [];
 
             genres.forEach(g => {
                 genreScores[g] = (genreScores[g] || 0) + weight;
@@ -1517,14 +1643,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return candidates.slice(0, 10).map(c => ({
                 ...c,
                 reason: '🌟 Gateway Classic',
-                rating: SHOW_METADATA[String(c.id)]?.rating || 8.4
+                rating: getShowClassification(c)?.rating || 8.4
             }));
         }
 
-        // Score each candidate
+        // Score each candidate with strict category and tone boundaries
         const scored = candidates.map(c => {
             let score = 0;
-            const meta = SHOW_METADATA[String(c.id)] || { genres: inferGenresFromTitleAndOverview(c.title, c.overview), rating: 8.0, tags: [] };
+            const meta = getShowClassification(c);
             const candidateGenres = meta.genres || [];
             const candidateTags = meta.tags || [];
 
@@ -1536,15 +1662,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 else if (idx >= 2) score += 4;
             });
 
-            // Seed show similarity from library
+            // Seed show similarity from library with cross-tone isolation
             let bestSeedMatch = null;
             profile.positiveSeeds.forEach(seed => {
-                const seedMeta = SHOW_METADATA[String(seed.tmdb_id || seed.id)] || { genres: inferGenresFromTitleAndOverview(seed.title), tags: [] };
-                const sharedGenres = candidateGenres.filter(g => seedMeta.genres.includes(g));
-                const sharedTags = candidateTags.filter(t => (seedMeta.tags || []).includes(t));
-                if (sharedGenres.length >= 2 || sharedTags.length >= 1) {
-                    score += 7;
+                const seedMeta = getShowClassification(seed);
+                
+                // Strict isolation: Never recommend dark/gritty shows based on lighthearted comedy seeds
+                if (seedMeta.tone === 'lighthearted' && (meta.tone === 'dark' || meta.tone === 'gritty' || meta.tone === 'tense')) {
+                    return;
+                }
+                // Never recommend lighthearted comedies based on dark/gritty drama seeds
+                if ((seedMeta.tone === 'dark' || seedMeta.tone === 'gritty') && meta.primaryCategory === 'lighthearted_comedy') {
+                    return;
+                }
+
+                // Category affinity boost (+8)
+                if (seedMeta.primaryCategory === meta.primaryCategory) {
+                    score += 8;
                     if (!bestSeedMatch) bestSeedMatch = seed;
+                } else {
+                    const sharedGenres = candidateGenres.filter(g => seedMeta.genres.includes(g));
+                    const sharedTags = candidateTags.filter(t => (seedMeta.tags || []).includes(t));
+                    if (sharedGenres.length >= 2 || sharedTags.length >= 1) {
+                        score += 5;
+                        if (!bestSeedMatch) bestSeedMatch = seed;
+                    }
                 }
             });
 
@@ -1556,7 +1698,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Quality score from rating
             score += (meta.rating || 8.0);
 
-            // Boosts and tailored rationale from 30s Taste Quiz
+            // Boosts and tailored rationale from 30s Taste Quiz with strict mood isolation
             let quizRationale = null;
             if (tasteQuizAnswers) {
                 const q1 = TASTE_QUIZ_QUESTIONS[0].options.find(o => o.id === tasteQuizAnswers.mood);
@@ -1564,35 +1706,50 @@ document.addEventListener('DOMContentLoaded', () => {
                 const q3 = TASTE_QUIZ_QUESTIONS[2].options.find(o => o.id === tasteQuizAnswers.pace);
                 const q4 = TASTE_QUIZ_QUESTIONS[3].options.find(o => o.id === tasteQuizAnswers.service);
 
-                // Mood match (+15 pts)
-                if (q1?.genres?.some(g => candidateGenres.includes(g))) {
-                    score += 15;
-                    quizRationale = `⚡ 30s Quiz: ${q1.label}`;
-                }
-
-                // World setting match (+10 pts)
-                const matchedWorldTags = (q2?.tags || []).filter(t => candidateTags.includes(t));
-                if (matchedWorldTags.length > 0 || (q2?.genres && q2.genres.some(g => candidateGenres.includes(g)))) {
-                    score += 10;
-                    if (!quizRationale) {
-                        quizRationale = `🌍 Quiz World: ${q2.label}`;
+                // Strict Mood Eligibility Check
+                const isMoodEligible = checkMoodEligibility(c, tasteQuizAnswers.mood);
+                if (!isMoodEligible) {
+                    score -= 1000; // Hard disqualification for conflicting tone/genre candidates
+                } else {
+                    score += 25; // Decisive mood alignment
+                    if (tasteQuizAnswers.mood === 'lighthearted') {
+                        quizRationale = '😂 Lighthearted Comfort Pick';
+                    } else if (tasteQuizAnswers.mood === 'drama') {
+                        quizRationale = '🎭 Deep Prestige Drama Pick';
+                    } else if (tasteQuizAnswers.mood === 'mindbending') {
+                        quizRationale = '🌌 Mind-Bending Sci-Fi Pick';
+                    } else if (tasteQuizAnswers.mood === 'adrenaline') {
+                        quizRationale = '⚡ High-Stakes Action Pick';
+                    } else if (tasteQuizAnswers.mood === 'crime') {
+                        quizRationale = '🕵️ Gritty Investigation Pick';
                     }
                 }
 
-                // Narrative pacing match (+8 pts)
-                const matchedPaceTags = (q3?.tags || []).filter(t => candidateTags.includes(t));
-                if (matchedPaceTags.length > 0) {
-                    score += 8;
-                }
-                if (q3?.boostHighRating && (meta.rating || 0) >= 8.3) {
-                    score += 4;
-                }
+                // World setting match (+8 pts) - only for eligible candidates
+                if (isMoodEligible) {
+                    const matchedWorldTags = (q2?.tags || []).filter(t => candidateTags.includes(t));
+                    if (matchedWorldTags.length > 0 || (q2?.genres && q2.genres.some(g => candidateGenres.includes(g)))) {
+                        score += 8;
+                        if (!quizRationale && Math.random() > 0.6) {
+                            quizRationale = `🌍 Quiz World: ${q2.label}`;
+                        }
+                    }
 
-                // Preferred streaming service match (+9 pts)
-                if (q4?.id && q4.id !== 'any' && c.serviceKey === q4.id) {
-                    score += 9;
-                    if (!quizRationale && Math.random() > 0.4) {
-                        quizRationale = `📺 Acclaimed on ${q4.label} (Quiz Match)`;
+                    // Narrative pacing match (+6 pts)
+                    const matchedPaceTags = (q3?.tags || []).filter(t => candidateTags.includes(t));
+                    if (matchedPaceTags.length > 0) {
+                        score += 6;
+                    }
+                    if (q3?.boostHighRating && (meta.rating || 0) >= 8.3) {
+                        score += 4;
+                    }
+
+                    // Preferred streaming service match (+9 pts)
+                    if (q4?.id && q4.id !== 'any' && c.serviceKey === q4.id) {
+                        score += 9;
+                        if (!quizRationale && Math.random() > 0.4) {
+                            quizRationale = `📺 Acclaimed on ${q4.label} (Quiz Match)`;
+                        }
                     }
                 }
             }
@@ -1619,8 +1776,10 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         });
 
-        scored.sort((a, b) => b.score - a.score);
-        return scored.slice(0, 18);
+        // Retain only valid, positively scored candidates
+        const eligibleScored = scored.filter(c => c.score > 0);
+        eligibleScored.sort((a, b) => b.score - a.score);
+        return eligibleScored.slice(0, 18);
     }
 
     function renderSmartRecommendationsView() {
