@@ -41,6 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const viewLibrary = document.getElementById('view-library');
     const viewRecommendations = document.getElementById('view-recommendations');
     const viewExplore = document.getElementById('view-explore');
+    const viewChangelog = document.getElementById('view-changelog');
+    const versionBtn = document.getElementById('version-btn');
+    const closeChangelogBtn = document.getElementById('close-changelog-btn');
     const libraryCountBadge = document.getElementById('library-count-badge');
     const libraryHeaderCount = document.getElementById('library-header-count');
     const recCountBadge = document.getElementById('rec-count-badge');
@@ -322,7 +325,160 @@ document.addEventListener('DOMContentLoaded', () => {
     const customService = document.getElementById('custom-service');
     const customAddBtn = document.getElementById('custom-add-btn');
 
-    // --- Initialization ---
+    // Admin Authentication Elements
+    const adminAuthModal = document.getElementById('admin-auth-modal');
+    const closeAdminAuthBtn = document.getElementById('close-admin-auth-btn');
+    const adminAuthTitle = document.getElementById('admin-auth-title');
+    const adminAuthDesc = document.getElementById('admin-auth-desc');
+    const adminVerifyForm = document.getElementById('admin-verify-form');
+    const adminPassInput = document.getElementById('admin-pass-input');
+    const adminVerifySubmitBtn = document.getElementById('admin-verify-submit-btn');
+    const adminVerifyCancelBtn = document.getElementById('admin-verify-cancel-btn');
+    const adminSetupForm = document.getElementById('admin-setup-form');
+    const adminSetupPass = document.getElementById('admin-setup-pass');
+    const adminSetupConfirm = document.getElementById('admin-setup-confirm');
+    const adminSetupSubmitBtn = document.getElementById('admin-setup-submit-btn');
+    const adminSetupCancelBtn = document.getElementById('admin-setup-cancel-btn');
+    const adminAuthError = document.getElementById('admin-auth-error');
+    const adminAuthStatus = document.getElementById('admin-auth-status');
+    const adminChangePass = document.getElementById('admin-change-pass');
+    const adminChangeConfirm = document.getElementById('admin-change-confirm');
+    const updateAdminPassBtn = document.getElementById('update-admin-pass-btn');
+    const adminPassStatus = document.getElementById('admin-pass-status');
+
+    // --- Hardened Cryptographic Admin Authentication & Rate Limiting ---
+    async function hashSha256(text) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(text);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function getStoredAdminHash() {
+        try {
+            const cloudHash = await window.db.getSystemSetting('admin_password_hash');
+            if (cloudHash) {
+                localStorage.setItem('tv_admin_password_hash', cloudHash);
+                return cloudHash;
+            }
+        } catch (e) {
+            console.warn("Could not retrieve admin password hash from cloud:", e);
+        }
+        return localStorage.getItem('tv_admin_password_hash') || null;
+    }
+
+    async function saveAdminHash(hash) {
+        localStorage.setItem('tv_admin_password_hash', hash);
+        try {
+            await window.db.setSystemSetting('admin_password_hash', hash);
+        } catch (e) {
+            console.warn("Could not sync admin password hash to cloud:", e);
+        }
+    }
+
+    let failedAttempts = 0;
+    let lockoutExpiresAt = 0;
+    let lockoutInterval = null;
+    let pendingAdminCallback = null;
+
+    function checkLockoutState() {
+        if (!adminAuthError || !adminPassInput || !adminVerifySubmitBtn) return false;
+        const now = Date.now();
+        if (now < lockoutExpiresAt) {
+            const secondsLeft = Math.ceil((lockoutExpiresAt - now) / 1000);
+            adminAuthError.textContent = `Too many failed attempts. Locked out for ${secondsLeft}s.`;
+            adminAuthError.style.display = 'block';
+            adminPassInput.disabled = true;
+            adminVerifySubmitBtn.disabled = true;
+            return true;
+        } else {
+            if (lockoutExpiresAt > 0) {
+                lockoutExpiresAt = 0;
+                failedAttempts = 0;
+                if (lockoutInterval) {
+                    clearInterval(lockoutInterval);
+                    lockoutInterval = null;
+                }
+                adminAuthError.textContent = '';
+                adminAuthError.style.display = 'none';
+                adminPassInput.disabled = false;
+                adminVerifySubmitBtn.disabled = false;
+            }
+            return false;
+        }
+    }
+
+    function startLockoutTimer() {
+        lockoutExpiresAt = Date.now() + 30000;
+        checkLockoutState();
+        if (lockoutInterval) clearInterval(lockoutInterval);
+        lockoutInterval = setInterval(() => {
+            const isLocked = checkLockoutState();
+            if (!isLocked) {
+                clearInterval(lockoutInterval);
+                lockoutInterval = null;
+            }
+        }, 1000);
+    }
+
+    async function requireAdminAuth(callback) {
+        if (sessionStorage.getItem('tv_admin_authed') === 'true') {
+            if (typeof callback === 'function') callback();
+            return;
+        }
+
+        pendingAdminCallback = callback;
+        if (adminAuthError) {
+            adminAuthError.textContent = '';
+            adminAuthError.style.display = 'none';
+        }
+        if (adminAuthStatus) {
+            adminAuthStatus.textContent = '';
+            adminAuthStatus.style.display = 'none';
+        }
+
+        const storedHash = await getStoredAdminHash();
+        if (!storedHash) {
+            // Mode: Initial Setup
+            if (adminAuthTitle) adminAuthTitle.textContent = 'Setup Admin Password';
+            if (adminAuthDesc) adminAuthDesc.textContent = 'Create a secure master password to safeguard Settings and Version History. Only you will know this password.';
+            if (adminVerifyForm) adminVerifyForm.style.display = 'none';
+            if (adminSetupForm) adminSetupForm.style.display = 'block';
+            if (adminSetupPass) adminSetupPass.value = '';
+            if (adminSetupConfirm) adminSetupConfirm.value = '';
+            if (adminAuthModal) adminAuthModal.classList.remove('hidden');
+            setTimeout(() => { if (adminSetupPass) adminSetupPass.focus(); }, 100);
+        } else {
+            // Mode: Verification
+            if (adminAuthTitle) adminAuthTitle.textContent = 'Admin Access Required';
+            if (adminAuthDesc) adminAuthDesc.textContent = 'Enter your master admin password to continue.';
+            if (adminSetupForm) adminSetupForm.style.display = 'none';
+            if (adminVerifyForm) adminVerifyForm.style.display = 'block';
+            if (adminPassInput) {
+                adminPassInput.value = '';
+                adminPassInput.disabled = false;
+            }
+            if (adminVerifySubmitBtn) adminVerifySubmitBtn.disabled = false;
+            if (adminAuthModal) adminAuthModal.classList.remove('hidden');
+            if (!checkLockoutState()) {
+                setTimeout(() => { if (adminPassInput) adminPassInput.focus(); }, 100);
+            }
+        }
+    }
+
+    function closeAdminAuthModal() {
+        if (adminAuthModal) adminAuthModal.classList.add('hidden');
+        if (adminAuthError) {
+            adminAuthError.textContent = '';
+            adminAuthError.style.display = 'none';
+        }
+        if (adminAuthStatus) {
+            adminAuthStatus.textContent = '';
+            adminAuthStatus.style.display = 'none';
+        }
+        pendingAdminCallback = null;
+    }
     async function init() {
         window.db.onAuthStateChange(async (event, session) => {
             currentUser = session?.user || null;
@@ -391,6 +547,10 @@ document.addEventListener('DOMContentLoaded', () => {
             viewExplore.classList.toggle('active', viewName === 'explore');
             viewExplore.style.display = viewName === 'explore' ? 'block' : 'none';
         }
+        if (viewChangelog) {
+            viewChangelog.classList.toggle('active', viewName === 'changelog');
+            viewChangelog.style.display = viewName === 'changelog' ? 'block' : 'none';
+        }
 
         if (viewName === 'library') {
             renderContinueWatching();
@@ -407,6 +567,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             renderServiceDiscovery(currentExploreService);
+        } else if (viewName === 'changelog') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         updateLibraryCounters();
@@ -2227,21 +2389,39 @@ document.addEventListener('DOMContentLoaded', () => {
             addShowsModal.classList.add('hidden');
         });
 
-        settingsBtn.addEventListener('click', async () => {
-            settingsModal.classList.remove('hidden');
-            const cloudKey = await window.db.getSystemSetting('tmdb_api_key');
-            if (cloudKey) {
-                tmdbApiKeyInput.value = cloudKey;
-                localStorage.setItem('tmdb_api_key', cloudKey);
-            } else {
-                const savedKey = localStorage.getItem('tmdb_api_key');
-                if (savedKey) tmdbApiKeyInput.value = savedKey;
-            }
+        settingsBtn.addEventListener('click', () => {
+            requireAdminAuth(async () => {
+                settingsModal.classList.remove('hidden');
+                const cloudKey = await window.db.getSystemSetting('tmdb_api_key');
+                if (cloudKey) {
+                    tmdbApiKeyInput.value = cloudKey;
+                    localStorage.setItem('tmdb_api_key', cloudKey);
+                } else {
+                    const savedKey = localStorage.getItem('tmdb_api_key');
+                    if (savedKey) tmdbApiKeyInput.value = savedKey;
+                }
+            });
         });
         
         closeSettingsBtn.addEventListener('click', () => {
             settingsModal.classList.add('hidden');
         });
+
+        // Header Version Badge Button (Password Protected)
+        if (versionBtn) {
+            versionBtn.addEventListener('click', () => {
+                requireAdminAuth(() => {
+                    switchView('changelog');
+                });
+            });
+        }
+
+        // Close / Back Button from Inline Changelog
+        if (closeChangelogBtn) {
+            closeChangelogBtn.addEventListener('click', () => {
+                switchView('library');
+            });
+        }
 
         if (closeImdbModalBtn) {
             closeImdbModalBtn.addEventListener('click', () => {
@@ -2262,8 +2442,160 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (imdbModal && !imdbModal.classList.contains('hidden')) {
                     closeImdbModal();
                 }
+                if (adminAuthModal && !adminAuthModal.classList.contains('hidden')) {
+                    closeAdminAuthModal();
+                }
             }
         });
+
+        // Admin Auth Modal controls
+        if (closeAdminAuthBtn) {
+            closeAdminAuthBtn.addEventListener('click', closeAdminAuthModal);
+        }
+        if (adminVerifyCancelBtn) {
+            adminVerifyCancelBtn.addEventListener('click', closeAdminAuthModal);
+        }
+        if (adminSetupCancelBtn) {
+            adminSetupCancelBtn.addEventListener('click', closeAdminAuthModal);
+        }
+        if (adminAuthModal) {
+            adminAuthModal.addEventListener('click', (e) => {
+                if (e.target === adminAuthModal) closeAdminAuthModal();
+            });
+        }
+
+        // Admin Setup Form (Initial Password Creation)
+        if (adminSetupForm) {
+            adminSetupForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                adminAuthError.style.display = 'none';
+                adminAuthError.textContent = '';
+
+                const pass = adminSetupPass.value;
+                const confirm = adminSetupConfirm.value;
+
+                if (!pass || pass.length < 4) {
+                    adminAuthError.textContent = 'Password must be at least 4 characters.';
+                    adminAuthError.style.display = 'block';
+                    return;
+                }
+                if (pass !== confirm) {
+                    adminAuthError.textContent = 'Passwords do not match. Please verify.';
+                    adminAuthError.style.display = 'block';
+                    return;
+                }
+
+                adminSetupSubmitBtn.disabled = true;
+                adminSetupSubmitBtn.textContent = 'Saving...';
+                try {
+                    const hash = await hashSha256(pass);
+                    await saveAdminHash(hash);
+                    sessionStorage.setItem('tv_admin_authed', 'true');
+                    showToast('Admin password created successfully!', 'success');
+                    closeAdminAuthModal();
+                    if (typeof pendingAdminCallback === 'function') {
+                        const cb = pendingAdminCallback;
+                        pendingAdminCallback = null;
+                        cb();
+                    }
+                } catch (err) {
+                    adminAuthError.textContent = 'Error saving password: ' + err.message;
+                    adminAuthError.style.display = 'block';
+                } finally {
+                    adminSetupSubmitBtn.disabled = false;
+                    adminSetupSubmitBtn.textContent = 'Save Password';
+                }
+            });
+        }
+
+        // Admin Verify Form (Password Authentication & Rate Limiting)
+        if (adminVerifyForm) {
+            adminVerifyForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (checkLockoutState()) return;
+
+                adminAuthError.style.display = 'none';
+                adminAuthError.textContent = '';
+
+                const enteredPass = adminPassInput.value;
+                if (!enteredPass) return;
+
+                adminVerifySubmitBtn.disabled = true;
+                adminVerifySubmitBtn.textContent = 'Verifying...';
+
+                try {
+                    const enteredHash = await hashSha256(enteredPass);
+                    const storedHash = await getStoredAdminHash();
+
+                    if (enteredHash === storedHash) {
+                        failedAttempts = 0;
+                        sessionStorage.setItem('tv_admin_authed', 'true');
+                        closeAdminAuthModal();
+                        if (typeof pendingAdminCallback === 'function') {
+                            const cb = pendingAdminCallback;
+                            pendingAdminCallback = null;
+                            cb();
+                        }
+                    } else {
+                        failedAttempts++;
+                        if (failedAttempts >= 5) {
+                            startLockoutTimer();
+                        } else {
+                            const attemptsRemaining = 5 - failedAttempts;
+                            adminAuthError.textContent = `Incorrect password. (${attemptsRemaining} attempt${attemptsRemaining === 1 ? '' : 's'} remaining)`;
+                            adminAuthError.style.display = 'block';
+                            adminPassInput.select();
+                        }
+                    }
+                } catch (err) {
+                    adminAuthError.textContent = 'Authentication error: ' + err.message;
+                    adminAuthError.style.display = 'block';
+                } finally {
+                    if (!checkLockoutState()) {
+                        adminVerifySubmitBtn.disabled = false;
+                        adminVerifySubmitBtn.textContent = 'Unlock';
+                    }
+                }
+            });
+        }
+
+        // Update Admin Password from Settings Card
+        if (updateAdminPassBtn) {
+            updateAdminPassBtn.addEventListener('click', async () => {
+                const newPass = adminChangePass.value;
+                const confirmPass = adminChangeConfirm.value;
+                adminPassStatus.style.display = 'block';
+
+                if (!newPass || newPass.length < 4) {
+                    adminPassStatus.textContent = 'Password must be at least 4 characters.';
+                    adminPassStatus.style.color = '#ff4444';
+                    return;
+                }
+                if (newPass !== confirmPass) {
+                    adminPassStatus.textContent = 'Passwords do not match.';
+                    adminPassStatus.style.color = '#ff4444';
+                    return;
+                }
+
+                updateAdminPassBtn.disabled = true;
+                updateAdminPassBtn.textContent = 'Updating...';
+                try {
+                    const newHash = await hashSha256(newPass);
+                    await saveAdminHash(newHash);
+                    adminPassStatus.textContent = 'Admin password updated successfully!';
+                    adminPassStatus.style.color = 'var(--success-color)';
+                    adminChangePass.value = '';
+                    adminChangeConfirm.value = '';
+                    showToast('Admin password updated successfully!', 'success');
+                } catch (err) {
+                    adminPassStatus.textContent = 'Error updating password: ' + err.message;
+                    adminPassStatus.style.color = '#ff4444';
+                } finally {
+                    updateAdminPassBtn.disabled = false;
+                    updateAdminPassBtn.textContent = 'Update Admin Password';
+                }
+            });
+        }
 
         saveTmdbKeyBtn.addEventListener('click', async () => {
             const key = tmdbApiKeyInput.value.trim();

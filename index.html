@@ -5,20 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=0.14.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=0.14.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=0.14.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=0.15.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=0.15.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=0.15.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=0.14.0">
+    <link rel="stylesheet" href="style.css?v=0.15.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
     <header class="site-header">
         <div class="logo">
             <h1>Seelye TV Hub</h1>
-            <span class="domain">tv.seelye.info</span>
+            <div class="logo-subline">
+                <span class="domain">tv.seelye.info</span>
+                <span class="logo-divider">•</span>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 0.15.0</button>
+            </div>
         </div>
         <div class="auth-section">
             <button id="add-shows-btn" class="btn secondary-btn" style="margin-right: 10px;">+ Add Shows</button>
@@ -161,28 +165,113 @@
                 </div>
             </section>
         </div>
+
+        <!-- VIEW 4: Version History & Changelog (100% Inline, Admin Protected) -->
+        <div class="view-panel" id="view-changelog" style="display: none;">
+            <section class="changelog-view-section">
+                <div class="changelog-header-row">
+                    <div>
+                        <div class="changelog-title-group">
+                            <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
+                            <span class="changelog-current-badge">Beta 0.15.0</span>
+                        </div>
+                        <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
+                    </div>
+                    <button class="btn secondary-btn" id="close-changelog-btn" type="button" style="display: inline-flex; align-items: center; gap: 6px;">
+                        <span>&larr;</span> Back to Library
+                    </button>
+                </div>
+
+                <div class="changelog-timeline-wrap">
+                    <ul class="changelog-timeline-list">
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 0.15.0</span>
+                                <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Header Version Button &amp; Administrative Password Protection:</strong> Relocated version indicator to the header alongside <code>tv.seelye.info</code> in matched typography and size. Converted version indicator into an interactive trigger that unlocks the comprehensive release history rendered 100% inline in accordance with zero-modal architecture. Safeguarded both Settings and Version History with master admin password protection, Web Crypto SHA-256 one-way hashing, cloud sync via <code>system_settings</code>, and 5-attempt rate-limited brute-force lockout safeguards.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 0.14.0</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Browser Tab App Icon &amp; Brand Identity:</strong> Added custom browser tab favicons tailored to the app's dark neon aesthetic. Includes an ultra-crisp vector SVG favicon (<code>favicon.svg</code>) featuring a glowing electric-cyan widescreen TV monitor with centered play beacon on obsidian slate, complemented by high-res PNG and Apple Touch icons (<code>apple-touch-icon.png</code>) and standard ICO fallback for Chrome, Edge, Firefox, and Safari tabs.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 0.13.0</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Strict Category &amp; Tone Recommendation Boundaries:</strong> Comprehensive taxonomy overhaul classifying every catalog and TMDB title into distinct primary categories (lighthearted comedy, prestige drama, dark supernatural mystery, mind-bending sci-fi, gritty crime, action-thriller) and explicit tones (lighthearted, wholesome, dark, gritty, tense, serious, satirical). Strict mood isolation eliminates overlap, ensuring dark gothic mysteries like <em>Wednesday</em>, caustic satires like <em>The Bear</em>, and intense thrillers like <em>Squid Game</em> are never cross-recommended in lighthearted comedy queues or confused with pure prestige dramas.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 0.12.0</span>
+                            </div>
+                            <p class="changelog-desc"><strong>30-Second Entertainment Taste Quiz:</strong> Added a fast, interactive 4-question taste quiz rendered 100% inline in Smart Recommendations. Calibrates the recommendation queue in under 30 seconds across mood/vibe, story world, narrative pacing, and streaming service affinities with instant ranking boosts, custom rationale badges, and one-click retake/reset controls.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 0.11.0</span>
+                            </div>
+                            <p class="changelog-desc"><strong>IMDb Show Details Pop-up Modal:</strong> Decoupled show addition from card clicking so shows are only added via the explicit "+ Add to Library" button. Clicking any show's picture opens a dedicated IMDb pop-up modal over the screen with full plot synopses, cast, seasons, ratings, direct IMDb link, and an interactive "x" close button.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 0.10.0</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Apple TV+ Streaming Option:</strong> Integrated Apple TV+ across the application including personal library provider filters, explore streaming services discovery with acclaimed hits (Ted Lasso, Severance, Silo, Slow Horses, and more), taste profile analysis, and TMDB addition.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 0.9.0</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Architecture &amp; Smart Recommendations Overhaul:</strong> Separated personal My Library from Explore Streaming Services into dedicated inline views with real-time counters and status filters. Added multi-vector intelligent recommendation engine analyzing watch history, thumbs-up ratings, and genre profiles with contextual rationale badges.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 0.8.0</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Streaming Service Discovery:</strong> Clicking any streaming service (Netflix, Disney+, Peacock, Hulu, Prime Video, YouTube TV) instantly displays currently popular and classic shows for that service with one-click library addition.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 0.7.0</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Fixed TMDB search cut-off posters:</strong> Eliminated inner scroll-traps and expanded result card grid (min 185px). Made entire show card clickable for instant library addition with responsive visual feedback, resolved Supabase UUID formatting and guest mode storage persistence, and enabled Enter key search with catalog-to-TMDB fallback.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 0.6.0</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Comprehensive Audit &amp; Overhaul:</strong> Fixed live catalog render on show addition, normalized streaming service filters, added show deletion/removal, resilient offline/guest storage sync, and repaired modal layout structures.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 0.5.0</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Pivot to Smart Watchlist:</strong> Added "Continue Watching", "Recommended For You", Custom YouTube TV additions, and Status Tracking.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 0.4.1</span>
+                            </div>
+                            <p class="changelog-desc">Converted Admin Panel to a clean Modal UI overlay to fix catalog visibility bugs.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 0.4.0</span>
+                            </div>
+                            <p class="changelog-desc">Implemented Cloud System Settings syncing.</p>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+        </div>
     </main>
 
     <footer class="site-footer">
-        <div class="version-info">
-            <strong>Version: Beta 0.14.0</strong>
-        </div>
-        <div class="changelog">
-            <h3>Version History</h3>
-            <ul>
-                <li><strong>Beta 0.14.0</strong> - Browser Tab App Icon & Brand Identity: Added custom browser tab favicons tailored to the app's dark neon aesthetic. Includes an ultra-crisp vector SVG favicon (`favicon.svg`) featuring a glowing electric-cyan widescreen TV monitor with centered play beacon on obsidian slate, complemented by high-res PNG and Apple Touch icons (`apple-touch-icon.png`) and standard ICO fallback for Chrome, Edge, Firefox, and Safari tabs.</li>
-                <li><strong>Beta 0.13.0</strong> - Strict Category & Tone Recommendation Boundaries: Comprehensive taxonomy overhaul classifying every catalog and TMDB title into distinct primary categories (lighthearted comedy, prestige drama, dark supernatural mystery, mind-bending sci-fi, gritty crime, action-thriller) and explicit tones (lighthearted, wholesome, dark, gritty, tense, serious, satirical). Strict mood isolation eliminates overlap, ensuring dark gothic mysteries like <em>Wednesday</em>, caustic satires like <em>The Bear</em>, and intense thrillers like <em>Squid Game</em> are never cross-recommended in lighthearted comedy queues or confused with pure prestige dramas.</li>
-                <li><strong>Beta 0.12.0</strong> - 30-Second Entertainment Taste Quiz: Added a fast, interactive 4-question taste quiz rendered 100% inline in Smart Recommendations. Calibrates the recommendation queue in under 30 seconds across mood/vibe, story world, narrative pacing, and streaming service affinities with instant ranking boosts, custom rationale badges, and one-click retake/reset controls.</li>
-                <li><strong>Beta 0.11.0</strong> - IMDb Show Details Pop-up Modal: Decoupled show addition from card clicking so shows are only added via the explicit "+ Add to Library" button. Clicking any show's picture opens a dedicated IMDb pop-up modal over the screen with full plot synopses, cast, seasons, ratings, direct IMDb link, and an interactive "x" close button.</li>
-                <li><strong>Beta 0.10.0</strong> - Apple TV+ Streaming Option: Integrated Apple TV+ across the application including personal library provider filters, explore streaming services discovery with acclaimed hits (Ted Lasso, Severance, Silo, Slow Horses, and more), taste profile analysis, and TMDB addition.</li>
-                <li><strong>Beta 0.9.0</strong> - Architecture & Smart Recommendations Overhaul: Separated personal My Library from Explore Streaming Services into dedicated inline views with real-time counters and status filters. Added multi-vector intelligent recommendation engine analyzing watch history, thumbs-up ratings, and genre profiles with contextual rationale badges.</li>
-                <li><strong>Beta 0.8.0</strong> - Streaming Service Discovery: Clicking any streaming service (Netflix, Disney+, Peacock, Hulu, Prime Video, YouTube TV) instantly displays currently popular and classic shows for that service with one-click library addition.</li>
-                <li><strong>Beta 0.7.0</strong> - Fixed TMDB search cut-off posters by eliminating inner scroll-traps and expanding result card grid (min 185px). Made entire show card clickable for instant library addition with responsive visual feedback, resolved Supabase UUID formatting and guest mode storage persistence, and enabled Enter key search with catalog-to-TMDB fallback.</li>
-                <li><strong>Beta 0.6.0</strong> - Comprehensive Audit & Overhaul: Fixed live catalog render on show addition, normalized streaming service filters, added show deletion/removal, resilient offline/guest storage sync, and repaired modal layout structures.</li>
-                <li><strong>Beta 0.5.0</strong> - Pivot to Smart Watchlist: Added "Continue Watching", "Recommended For You", Custom YouTube TV additions, and Status Tracking.</li>
-                <li><strong>Beta 0.4.1</strong> - Converted Admin Panel to a clean Modal UI overlay to fix catalog visibility bugs.</li>
-                <li><strong>Beta 0.4.0</strong> - Implemented Cloud System Settings syncing.</li>
-            </ul>
+        <div class="footer-content" style="text-align: center; font-size: 0.85rem; color: var(--text-muted);">
+            <p>&copy; 2026 Seelye TV Hub &bull; <span style="color: var(--accent-color);">tv.seelye.info</span></p>
         </div>
     </footer>
 
@@ -259,7 +348,67 @@
                     <button id="save-tmdb-key-btn" class="btn primary-btn">Save Key</button>
                     <p id="tmdb-key-status" class="status-msg"></p>
                 </div>
+
+                <!-- Admin Security Configuration -->
+                <div class="admin-card" id="admin-security-card" style="margin-top: 20px;">
+                    <h3>Admin Security</h3>
+                    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 14px;">Manage your private master admin password used to safeguard Settings and Version History.</p>
+                    <div class="input-group">
+                        <label for="admin-change-pass">New Master Password</label>
+                        <input type="password" id="admin-change-pass" placeholder="Enter new master password (min 4 chars)" autocomplete="new-password">
+                    </div>
+                    <div class="input-group">
+                        <label for="admin-change-confirm">Confirm New Password</label>
+                        <input type="password" id="admin-change-confirm" placeholder="Confirm new master password" autocomplete="new-password">
+                    </div>
+                    <button id="update-admin-pass-btn" class="btn secondary-btn" type="button">Update Admin Password</button>
+                    <p id="admin-pass-status" class="status-msg" style="margin-top: 10px;"></p>
+                </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Admin Authentication Modal (Password Protection) -->
+    <div id="admin-auth-modal" class="modal hidden" aria-modal="true" role="dialog">
+        <div class="modal-content" style="max-width: 440px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+                <div>
+                    <h2 id="admin-auth-title" style="margin: 0; font-size: 1.35rem;">Admin Access</h2>
+                    <p id="admin-auth-desc" style="color: var(--text-muted); font-size: 0.86rem; margin-top: 5px; line-height: 1.4;">Enter your admin password to continue.</p>
+                </div>
+                <span class="close-btn" id="close-admin-auth-btn" style="cursor: pointer; font-size: 1.5rem; line-height: 1;" title="Close">&times;</span>
+            </div>
+
+            <!-- Verification Mode -->
+            <form id="admin-verify-form" style="display: block;">
+                <div class="input-group">
+                    <label for="admin-pass-input">Master Password</label>
+                    <input type="password" id="admin-pass-input" placeholder="Enter master password" autocomplete="current-password" required>
+                </div>
+                <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px;">
+                    <button type="button" class="btn secondary-btn" id="admin-verify-cancel-btn">Cancel</button>
+                    <button type="submit" class="btn primary-btn" id="admin-verify-submit-btn">Unlock</button>
+                </div>
+            </form>
+
+            <!-- Initial Setup Mode -->
+            <form id="admin-setup-form" style="display: none;">
+                <div class="input-group">
+                    <label for="admin-setup-pass">Create Master Password</label>
+                    <input type="password" id="admin-setup-pass" placeholder="Create master password (min 4 characters)" autocomplete="new-password" required>
+                </div>
+                <div class="input-group">
+                    <label for="admin-setup-confirm">Confirm Master Password</label>
+                    <input type="password" id="admin-setup-confirm" placeholder="Re-enter master password" autocomplete="new-password" required>
+                </div>
+                <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px;">
+                    <button type="button" class="btn secondary-btn" id="admin-setup-cancel-btn">Cancel</button>
+                    <button type="submit" class="btn primary-btn" id="admin-setup-submit-btn">Save Password</button>
+                </div>
+            </form>
+
+            <p id="admin-auth-error" class="error-msg" style="margin-top: 12px; font-size: 0.88rem; display: none;"></p>
+            <p id="admin-auth-status" class="status-msg" style="margin-top: 12px; font-size: 0.88rem; display: none;"></p>
         </div>
     </div>
 
@@ -300,8 +449,8 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=0.14.0"></script>
-    <script src="db.js?v=0.14.0"></script>
-    <script src="app.js?v=0.14.0"></script>
+    <script src="service_catalog.js?v=0.15.0"></script>
+    <script src="db.js?v=0.15.0"></script>
+    <script src="app.js?v=0.15.0"></script>
 </body>
 </html>
