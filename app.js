@@ -31,6 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let isLoginMode = true;
     let currentDiscoveryService = null;
     let serviceCache = {};
+    let tasteQuizAnswers = JSON.parse(localStorage.getItem('tv_taste_quiz_answers') || 'null');
+    let isQuizActive = false;
+    let currentQuizStep = 0;
+    let quizDraftAnswers = {};
 
     // DOM Elements - Main & Navigation
     const mainNav = document.getElementById('main-nav');
@@ -61,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const continueWatchingGrid = document.getElementById('continue-watching-grid');
 
     // Smart Recommendations Elements
+    const tasteQuizContainer = document.getElementById('taste-quiz-container');
     const tasteProfileBanner = document.getElementById('taste-profile-banner');
     const smartRecsContent = document.getElementById('smart-recs-content');
 
@@ -1053,6 +1058,327 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- 30-Second Entertainment Taste Quiz Engine ---
+    const TASTE_QUIZ_QUESTIONS = [
+        {
+            id: 'mood',
+            title: 'What vibe or energy are you in the mood for?',
+            subtitle: 'Pick the primary feeling that pulls you in when sitting down to stream.',
+            options: [
+                {
+                    id: 'adrenaline',
+                    icon: '⚡',
+                    label: 'Adrenaline & High Stakes',
+                    desc: 'Action, thrillers, survival, intense battles & fast heart rates.',
+                    genres: ['Action & Adventure', 'Crime'],
+                    tags: ['survival', 'thriller', 'dark', 'monsters']
+                },
+                {
+                    id: 'mindbending',
+                    icon: '🌌',
+                    label: 'Mind-Bending & Complex',
+                    desc: 'Sci-Fi, mystery twists, multi-layered puzzles & alternate realities.',
+                    genres: ['Sci-Fi & Fantasy', 'Mystery'],
+                    tags: ['space', 'future', 'tech', 'quantum', 'puzzle', 'conspiracy']
+                },
+                {
+                    id: 'lighthearted',
+                    icon: '😂',
+                    label: 'Lighthearted & Comfort',
+                    desc: 'Feel-good comedy, sharp wit, lovable friendships & zero stress.',
+                    genres: ['Comedy'],
+                    tags: ['funny', 'laugh', 'sitcom', 'feel-good', 'friendship']
+                },
+                {
+                    id: 'drama',
+                    icon: '🎭',
+                    label: 'Deep Prestige Drama',
+                    desc: 'Character-driven emotional depth, family sagas & moral conflicts.',
+                    genres: ['Drama'],
+                    tags: ['character', 'royalty', 'politics', 'masterpiece', 'family']
+                },
+                {
+                    id: 'crime',
+                    icon: '🕵️',
+                    label: 'Gritty Crime & Investigations',
+                    desc: 'Detectives, mob empires, cartel syndicates & thrilling whodunits.',
+                    genres: ['Crime', 'Mystery'],
+                    tags: ['detective', 'police', 'cartel', 'investigat', 'drugs', 'mafia']
+                }
+            ]
+        },
+        {
+            id: 'world',
+            title: 'Which story worlds pull you in the most?',
+            subtitle: 'Choose the universe or setting that sparks your imagination.',
+            options: [
+                {
+                    id: 'space_future',
+                    icon: '🚀',
+                    label: 'Distant Galaxies & High Tech',
+                    desc: 'Futuristic dystopias, interstellar exploration & alien civilizations.',
+                    genres: ['Sci-Fi & Fantasy'],
+                    tags: ['space', 'star wars', 'future', 'dystopia', 'tech']
+                },
+                {
+                    id: 'urban_streets',
+                    icon: '🏙️',
+                    label: 'Modern Metros & Underworlds',
+                    desc: 'High-stakes corporate rooms, gritty streets, law firms & big city crime.',
+                    genres: ['Crime', 'Drama'],
+                    tags: ['money laundering', 'cartel', 'lawyer', 'drugs', 'fbi']
+                },
+                {
+                    id: 'history_royals',
+                    icon: '👑',
+                    label: 'Historic Eras & Dynasties',
+                    desc: 'Royalty, monarchies, period costumes, ancient legends & revolutions.',
+                    genres: ['Drama', 'History'],
+                    tags: ['royalty', 'politics', 'biography', 'period', 'regency']
+                },
+                {
+                    id: 'cozy_towns',
+                    icon: '☕',
+                    label: 'Relatable Towns & Everyday Communities',
+                    desc: 'Schools, tight-knit neighborhoods, workplace banter & warm romance.',
+                    genres: ['Comedy', 'Drama'],
+                    tags: ['high school', 'friendship', 'romance', 'feel-good']
+                }
+            ]
+        },
+        {
+            id: 'pace',
+            title: 'How do you prefer stories to unfold?',
+            subtitle: 'Pick the storytelling pace and binge style you enjoy most.',
+            options: [
+                {
+                    id: 'cliffhangers',
+                    icon: '🏃',
+                    label: 'Relentless Cliffhangers',
+                    desc: 'Every episode ends on a shocking hook — impossible not to binge.',
+                    tags: ['survival', 'thriller', 'dark', 'monsters'],
+                    boostHighRating: true
+                },
+                {
+                    id: 'slowburn',
+                    icon: '🧩',
+                    label: 'Layered Slow-Burn Payoff',
+                    desc: 'Patient, atmospheric world-building that builds to a breathtaking climax.',
+                    tags: ['chess', 'prodigy', 'politics', 'masterpiece'],
+                    boostHighRating: true
+                },
+                {
+                    id: 'episodic',
+                    icon: '☕',
+                    label: 'Comforting & Episodic',
+                    desc: 'Self-contained episodes, enjoyable anytime without anxiety.',
+                    tags: ['sitcom', 'feel-good', 'comedy'],
+                    boostHighRating: false
+                },
+                {
+                    id: 'cinematic',
+                    icon: '🎬',
+                    label: 'Cinematic Grandeur',
+                    desc: 'Sweeping visual masterworks, soaring scores & award-winning prestige.',
+                    tags: ['masterpiece', 'cinematic', 'epic'],
+                    boostHighRating: true
+                }
+            ]
+        },
+        {
+            id: 'service',
+            title: 'Where do you find yourself streaming most often?',
+            subtitle: 'Priority weighting will be given to shows available on this platform.',
+            options: [
+                { id: 'netflix', icon: '🔴', label: 'Netflix', desc: 'Global blockbuster originals & viral binge sensations.' },
+                { id: 'appletv', icon: '🍏', label: 'Apple TV+', desc: 'Critically acclaimed, cinematic prestige series & visionary sci-fi.' },
+                { id: 'disney', icon: '🐭', label: 'Disney+', desc: 'Star Wars, Marvel, Pixar, family favorites & nostalgic hits.' },
+                { id: 'peacock', icon: '🦚', label: 'Peacock', desc: 'Acclaimed sitcoms, true-crime dramas & NBC universal favorites.' },
+                { id: 'hulu', icon: '🟢', label: 'Hulu', desc: 'Sharp contemporary dramas, edgy comedies & award-winners.' },
+                { id: 'prime', icon: '📦', label: 'Prime Video', desc: 'Epic fantasy sagas, gritty action thrillers & blockbuster series.' },
+                { id: 'any', icon: '📺', label: 'Any / Multi-Stream', desc: 'Open to the best content anywhere across all platforms.' }
+            ]
+        }
+    ];
+
+    function renderTasteQuizContainer() {
+        if (!tasteQuizContainer) return;
+
+        if (!isQuizActive) {
+            if (tasteQuizAnswers) {
+                const q1 = TASTE_QUIZ_QUESTIONS[0].options.find(o => o.id === tasteQuizAnswers.mood);
+                const q2 = TASTE_QUIZ_QUESTIONS[1].options.find(o => o.id === tasteQuizAnswers.world);
+                const q3 = TASTE_QUIZ_QUESTIONS[2].options.find(o => o.id === tasteQuizAnswers.pace);
+                const q4 = TASTE_QUIZ_QUESTIONS[3].options.find(o => o.id === tasteQuizAnswers.service);
+
+                tasteQuizContainer.innerHTML = `
+                    <div class="taste-quiz-prompt-card">
+                        <div class="taste-quiz-prompt-info">
+                            <div class="taste-quiz-prompt-title">
+                                <span>🎯 Recommendations Tuned by 30s Quiz</span>
+                            </div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
+                                ${q1 ? `<span class="quiz-pill-badge">${q1.icon} ${q1.label}</span>` : ''}
+                                ${q2 ? `<span class="quiz-pill-badge">${q2.icon} ${q2.label}</span>` : ''}
+                                ${q3 ? `<span class="quiz-pill-badge">${q3.icon} ${q3.label}</span>` : ''}
+                                ${q4 && q4.id !== 'any' ? `<span class="quiz-pill-badge">${q4.icon} ${q4.label}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="taste-quiz-prompt-actions">
+                            <button class="btn primary-btn" id="retake-taste-quiz-btn" style="padding: 8px 16px; font-size: 0.88rem;">
+                                🔄 Retake Quiz
+                            </button>
+                            <button class="btn secondary-btn" id="reset-taste-quiz-btn" style="padding: 8px 14px; font-size: 0.88rem;">
+                                Reset Tuning
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('retake-taste-quiz-btn')?.addEventListener('click', () => {
+                    isQuizActive = true;
+                    currentQuizStep = 0;
+                    quizDraftAnswers = { ...tasteQuizAnswers };
+                    renderTasteQuizContainer();
+                });
+
+                document.getElementById('reset-taste-quiz-btn')?.addEventListener('click', () => {
+                    resetTasteQuiz();
+                });
+            } else {
+                tasteQuizContainer.innerHTML = `
+                    <div class="taste-quiz-prompt-card">
+                        <div class="taste-quiz-prompt-info">
+                            <div class="taste-quiz-prompt-title">
+                                <span>⚡ Calibrate Your Taste in 30 Seconds</span>
+                            </div>
+                            <p class="taste-quiz-prompt-desc">
+                                Answer 4 quick questions about your mood, favorite worlds, and pacing to immediately tune your personalized recommendation queue.
+                            </p>
+                        </div>
+                        <div class="taste-quiz-prompt-actions">
+                            <button class="btn primary-btn" id="start-taste-quiz-btn" style="padding: 10px 20px; font-size: 0.95rem;">
+                                Start 30s Quiz →
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('start-taste-quiz-btn')?.addEventListener('click', () => {
+                    isQuizActive = true;
+                    currentQuizStep = 0;
+                    quizDraftAnswers = {};
+                    renderTasteQuizContainer();
+                });
+            }
+            return;
+        }
+
+        // Active Quiz View
+        const q = TASTE_QUIZ_QUESTIONS[currentQuizStep];
+        if (!q) return;
+
+        const progressPercent = Math.round(((currentQuizStep + 1) / TASTE_QUIZ_QUESTIONS.length) * 100);
+
+        tasteQuizContainer.innerHTML = `
+            <div class="taste-quiz-active-card">
+                <div class="quiz-step-indicator">
+                    <span>Question ${currentQuizStep + 1} of ${TASTE_QUIZ_QUESTIONS.length}</span>
+                    <span class="quiz-step-timer-badge">⏱️ 30s Quick Quiz</span>
+                </div>
+                <div class="quiz-progress-track">
+                    <div class="quiz-progress-fill" style="width: ${progressPercent}%;"></div>
+                </div>
+                <div class="quiz-question-heading">${q.title}</div>
+                <div class="quiz-question-subtext">${q.subtitle}</div>
+
+                <div class="quiz-options-grid">
+                    ${q.options.map(opt => {
+                        const isSelected = quizDraftAnswers[q.id] === opt.id;
+                        return `
+                            <button class="quiz-option-btn ${isSelected ? 'selected' : ''}" data-opt-id="${opt.id}">
+                                <span class="quiz-option-icon">${opt.icon}</span>
+                                <div style="flex: 1;">
+                                    <span class="quiz-option-label">${opt.label}</span>
+                                    <span class="quiz-option-desc">${opt.desc}</span>
+                                </div>
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+
+                <div class="quiz-action-bar">
+                    <div>
+                        ${currentQuizStep > 0 ? `
+                            <button class="btn secondary-btn" id="quiz-back-btn" style="padding: 8px 16px; font-size: 0.88rem;">
+                                ← Back
+                            </button>
+                        ` : `
+                            <button class="btn secondary-btn" id="quiz-cancel-btn" style="padding: 8px 16px; font-size: 0.88rem;">
+                                Cancel
+                            </button>
+                        `}
+                    </div>
+                    <div>
+                        <span style="font-size: 0.82rem; color: var(--text-muted);">Select an option to advance</span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Option click handlers
+        tasteQuizContainer.querySelectorAll('.quiz-option-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const optId = btn.dataset.optId;
+                quizDraftAnswers[q.id] = optId;
+
+                // Visual feedback
+                tasteQuizContainer.querySelectorAll('.quiz-option-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+
+                // Auto advance
+                setTimeout(() => {
+                    if (currentQuizStep < TASTE_QUIZ_QUESTIONS.length - 1) {
+                        currentQuizStep++;
+                        renderTasteQuizContainer();
+                    } else {
+                        finishTasteQuiz(quizDraftAnswers);
+                    }
+                }, 220);
+            });
+        });
+
+        // Back button
+        document.getElementById('quiz-back-btn')?.addEventListener('click', () => {
+            if (currentQuizStep > 0) {
+                currentQuizStep--;
+                renderTasteQuizContainer();
+            }
+        });
+
+        // Cancel button
+        document.getElementById('quiz-cancel-btn')?.addEventListener('click', () => {
+            isQuizActive = false;
+            renderTasteQuizContainer();
+        });
+    }
+
+    function finishTasteQuiz(answers) {
+        tasteQuizAnswers = answers;
+        localStorage.setItem('tv_taste_quiz_answers', JSON.stringify(answers));
+        isQuizActive = false;
+        showToast('✨ 30s Quiz complete! Calibrated your recommendations queue.', 'success');
+        renderSmartRecommendationsView();
+    }
+
+    function resetTasteQuiz() {
+        tasteQuizAnswers = null;
+        localStorage.removeItem('tv_taste_quiz_answers');
+        isQuizActive = false;
+        showToast('Reset quiz preferences to default library weighting.', 'info');
+        renderSmartRecommendationsView();
+    }
+
     // --- Smart Multi-Vector Recommendation Engine ---
     function inferGenresFromTitleAndOverview(title = '', overview = '') {
         const text = (title + ' ' + overview).toLowerCase();
@@ -1075,6 +1401,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let likedCount = 0;
         const positiveSeeds = [];
 
+        // Factor in library content
         allContent.forEach(item => {
             const idStr = String(item.id);
             const tmdbIdStr = String(item.tmdb_id || item.id);
@@ -1118,6 +1445,27 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
+        // Factor in 30-Second Quiz Answers if available
+        if (tasteQuizAnswers) {
+            const q1 = TASTE_QUIZ_QUESTIONS[0].options.find(o => o.id === tasteQuizAnswers.mood);
+            const q2 = TASTE_QUIZ_QUESTIONS[1].options.find(o => o.id === tasteQuizAnswers.world);
+            const q4 = TASTE_QUIZ_QUESTIONS[3].options.find(o => o.id === tasteQuizAnswers.service);
+
+            if (q1?.genres) {
+                q1.genres.forEach(g => {
+                    genreScores[g] = (genreScores[g] || 0) + 14;
+                });
+            }
+            if (q2?.genres) {
+                q2.genres.forEach(g => {
+                    genreScores[g] = (genreScores[g] || 0) + 9;
+                });
+            }
+            if (q4?.id && q4.id !== 'any') {
+                serviceCounts[q4.id] = (serviceCounts[q4.id] || 0) + 8;
+            }
+        }
+
         const sortedGenres = Object.entries(genreScores)
             .filter(([_, score]) => score > 0)
             .sort((a, b) => b[1] - a[1])
@@ -1132,7 +1480,8 @@ document.addEventListener('DOMContentLoaded', () => {
             watchingCount,
             likedCount,
             topService: topServiceName,
-            positiveSeeds
+            positiveSeeds,
+            quizAnswers: tasteQuizAnswers
         };
     }
 
@@ -1163,8 +1512,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return true;
         });
 
-        // If library is empty or < 2 shows: return starter curated gateway picks
-        if (profile.totalCount < 2) {
+        // If library is empty or < 2 shows AND no quiz was completed: return starter gateway picks
+        if (profile.totalCount < 2 && !tasteQuizAnswers) {
             return candidates.slice(0, 10).map(c => ({
                 ...c,
                 reason: '🌟 Gateway Classic',
@@ -1179,15 +1528,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const candidateGenres = meta.genres || [];
             const candidateTags = meta.tags || [];
 
-            // Genre synergy
+            // Genre synergy from profile
             candidateGenres.forEach(g => {
                 const idx = profile.topGenres.indexOf(g);
-                if (idx === 0) score += 9; // Top favorite genre
-                else if (idx === 1) score += 6;
-                else if (idx >= 2) score += 3;
+                if (idx === 0) score += 10; // Top favorite genre
+                else if (idx === 1) score += 7;
+                else if (idx >= 2) score += 4;
             });
 
-            // Seed show similarity
+            // Seed show similarity from library
             let bestSeedMatch = null;
             profile.positiveSeeds.forEach(seed => {
                 const seedMeta = SHOW_METADATA[String(seed.tmdb_id || seed.id)] || { genres: inferGenresFromTitleAndOverview(seed.title), tags: [] };
@@ -1207,9 +1556,52 @@ document.addEventListener('DOMContentLoaded', () => {
             // Quality score from rating
             score += (meta.rating || 8.0);
 
+            // Boosts and tailored rationale from 30s Taste Quiz
+            let quizRationale = null;
+            if (tasteQuizAnswers) {
+                const q1 = TASTE_QUIZ_QUESTIONS[0].options.find(o => o.id === tasteQuizAnswers.mood);
+                const q2 = TASTE_QUIZ_QUESTIONS[1].options.find(o => o.id === tasteQuizAnswers.world);
+                const q3 = TASTE_QUIZ_QUESTIONS[2].options.find(o => o.id === tasteQuizAnswers.pace);
+                const q4 = TASTE_QUIZ_QUESTIONS[3].options.find(o => o.id === tasteQuizAnswers.service);
+
+                // Mood match (+15 pts)
+                if (q1?.genres?.some(g => candidateGenres.includes(g))) {
+                    score += 15;
+                    quizRationale = `⚡ 30s Quiz: ${q1.label}`;
+                }
+
+                // World setting match (+10 pts)
+                const matchedWorldTags = (q2?.tags || []).filter(t => candidateTags.includes(t));
+                if (matchedWorldTags.length > 0 || (q2?.genres && q2.genres.some(g => candidateGenres.includes(g)))) {
+                    score += 10;
+                    if (!quizRationale) {
+                        quizRationale = `🌍 Quiz World: ${q2.label}`;
+                    }
+                }
+
+                // Narrative pacing match (+8 pts)
+                const matchedPaceTags = (q3?.tags || []).filter(t => candidateTags.includes(t));
+                if (matchedPaceTags.length > 0) {
+                    score += 8;
+                }
+                if (q3?.boostHighRating && (meta.rating || 0) >= 8.3) {
+                    score += 4;
+                }
+
+                // Preferred streaming service match (+9 pts)
+                if (q4?.id && q4.id !== 'any' && c.serviceKey === q4.id) {
+                    score += 9;
+                    if (!quizRationale && Math.random() > 0.4) {
+                        quizRationale = `📺 Acclaimed on ${q4.label} (Quiz Match)`;
+                    }
+                }
+            }
+
             // Contextual rationale badge
             let reason = '⭐ Highly Recommended';
-            if (bestSeedMatch) {
+            if (quizRationale) {
+                reason = quizRationale;
+            } else if (bestSeedMatch) {
                 reason = `✨ Because you watched ${bestSeedMatch.title}`;
             } else if (candidateGenres.some(g => g === profile.topGenres[0])) {
                 reason = `🔥 Top Pick in ${profile.topGenres[0]}`;
@@ -1233,14 +1625,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderSmartRecommendationsView() {
         if (!smartRecsContent) return;
+        renderTasteQuizContainer();
         const profile = computeTasteProfile();
 
         // Render Taste Profile Banner
         if (tasteProfileBanner) {
             tasteProfileBanner.innerHTML = `
                 <div class="taste-profile-header">
-                    <div class="taste-profile-title">
+                    <div class="taste-profile-title" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
                         <span>🧠 Your Entertainment Taste Profile</span>
+                        ${tasteQuizAnswers ? '<span class="quiz-pill-badge" style="font-size: 0.74rem;">🎯 30s Quiz Tuned</span>' : ''}
                     </div>
                     <div class="genre-tag-list">
                         ${profile.topGenres.length > 0 
@@ -1283,12 +1677,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         let headerNote = '';
-        if (profile.totalCount < 2) {
+        if (profile.totalCount < 2 && !tasteQuizAnswers) {
             headerNote = `
                 <div style="margin-bottom: 20px; padding: 14px 18px; background: rgba(0, 195, 255, 0.08); border: 1px solid rgba(0, 195, 255, 0.25); border-radius: 10px;">
                     <p style="font-size: 0.95rem; color: var(--text-main); margin: 0;">
-                        💡 <strong>Welcome to Smart Recommendations!</strong> As your library grows and you rate favorites with a Thumbs Up (👍), our intelligent engine automatically tailors these picks to your exact genres and habits. Here are acclaimed gateway hits across genres to kickstart your collection:
+                        💡 <strong>Welcome to Smart Recommendations!</strong> Take the 30-second quiz above or start adding shows to your library to calibrate these picks. Here are acclaimed starter gateway classics across popular genres:
                     </p>
+                </div>
+            `;
+        } else if (tasteQuizAnswers) {
+            headerNote = `
+                <div style="margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <h3 style="font-size: 1.25rem; color: var(--text-main); margin: 0;">🎯 Top Personalized Picks (Quiz Calibrated)</h3>
+                    <span style="font-size: 0.82rem; color: var(--text-muted);">Dynamically boosted by your 30s taste quiz preferences</span>
                 </div>
             `;
         } else {
@@ -1308,6 +1709,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
+    window.renderSmartRecommendationsView = renderSmartRecommendationsView;
+    window.renderTasteQuizContainer = renderTasteQuizContainer;
+    window.finishTasteQuiz = finishTasteQuiz;
+    window.resetTasteQuiz = resetTasteQuiz;
 
     function createSmartRecCard(item) {
         const fallbackPoster = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='450' viewBox='0 0 300 450'%3E%3Crect width='300' height='450' fill='%231e1e1e'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23666' font-family='sans-serif' font-size='16'%3ENo Poster%3C/text%3E%3C/svg%3E";
