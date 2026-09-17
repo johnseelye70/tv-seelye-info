@@ -1,18 +1,20 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // Global Error Catcher for Debugging on User's Screen
-    window.addEventListener('error', function(e) {
-        const err = document.createElement('div');
-        err.style = "position:fixed; top:0; left:0; width:100%; background:red; color:white; z-index:9999; padding:10px;";
-        err.textContent = "Error: " + e.message;
-        document.body.appendChild(err);
-    });
-    window.addEventListener('unhandledrejection', function(e) {
-        const err = document.createElement('div');
-        err.style = "position:fixed; top:40px; left:0; width:100%; background:orange; color:white; z-index:9999; padding:10px;";
-        err.textContent = "Promise Error: " + (e.reason?.message || e.reason);
-        document.body.appendChild(err);
-    });
+    // Non-intrusive Toast Notification System
+    function showToast(message, type = 'info', duration = 3500) {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `<span>${message}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(12px)';
+            toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    }
 
     // State
     let currentUser = null;
@@ -73,35 +75,27 @@ document.addEventListener('DOMContentLoaded', () => {
         window.db.onAuthStateChange(async (event, session) => {
             currentUser = session?.user || null;
             updateAuthUI();
+            if (currentUser) {
+                await window.db.syncLocalStorageToCloud(currentUser.id);
+            }
             await loadUserData();
         });
 
         currentUser = await window.db.getCurrentUser();
         updateAuthUI();
+        if (currentUser) {
+            await window.db.syncLocalStorageToCloud(currentUser.id);
+        }
         
         allServices = await window.db.getStreamingServices();
         allContent = await window.db.getContentItems();
-        
-        if (allContent.length === 0) {
-            /* allContent = getMockData(); removed */
-        }
 
         await loadUserData();
         setupEventListeners();
     }
 
     async function loadUserData() {
-        if (currentUser) {
-            userWatchlist = await window.db.getUserWatchlist(currentUser.id);
-        } else {
-            // Mock Watchlist for demo purposes so features are visible without auth
-            userWatchlist = [
-                { content_item_id: '1', status: 'completed', rating: 'thumbs_up' }, // Mando (Will recommend SciFi)
-                { content_item_id: '5', status: 'watching', rating: null }, // The Office
-                { content_item_id: '9', status: 'want_to_watch', rating: null } // Parks & Rec
-            ];
-        }
-        
+        userWatchlist = await window.db.getUserWatchlist(currentUser ? currentUser.id : null);
         await fetchRecommendations();
         renderAllSections();
     }
@@ -109,15 +103,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateAuthUI() {
         if (currentUser) {
             authStatusBadge.textContent = currentUser.email;
+            authStatusBadge.classList.add('logged-in');
             authBtn.textContent = 'Logout';
-            addShowsBtn.classList.remove('hidden');
-                settingsBtn.classList.remove('hidden');
         } else {
-            authStatusBadge.textContent = 'Guest';
+            authStatusBadge.textContent = 'Guest (Local)';
+            authStatusBadge.classList.remove('logged-in');
             authBtn.textContent = 'Login';
-            addShowsBtn.classList.add('hidden');
-            settingsBtn.classList.add('hidden');
         }
+        // Always make Add Shows and Settings buttons accessible
+        addShowsBtn.classList.remove('hidden');
+        settingsBtn.classList.remove('hidden');
     }
 
     // --- Render Logic ---
@@ -163,12 +158,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (status === 'completed') {
                 cardHtml += `
                         <div class="rating-bar">
-                            <button class="rating-btn up ${rating === 'thumbs_up' ? 'active' : ''}" data-id="${item.id}" data-val="thumbs_up">👍</button>
-                            <button class="rating-btn down ${rating === 'thumbs_down' ? 'active' : ''}" data-id="${item.id}" data-val="thumbs_down">👎</button>
+                            <button class="rating-btn up ${rating === 'thumbs_up' ? 'active' : ''}" data-id="${item.id}" data-val="thumbs_up" title="Thumbs Up">👍</button>
+                            <button class="rating-btn down ${rating === 'thumbs_down' ? 'active' : ''}" data-id="${item.id}" data-val="thumbs_down" title="Thumbs Down">👎</button>
                         </div>
                 `;
             }
-            cardHtml += `</div>`;
+            cardHtml += `
+                        <button class="remove-btn" data-id="${item.id}" data-title="${item.title.replace(/"/g, '&quot;')}">✕ Remove from Library</button>
+                    </div>`;
         } else {
             // It's a recommendation card
             cardHtml += `
@@ -185,6 +182,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return cardHtml;
     }
 
+    function matchesServiceFilter(item, filter) {
+        if (!filter || filter === 'all') return true;
+        const rawName = (item.streaming_services?.name || item.mock_service || '').toLowerCase().trim();
+        if (!rawName) return false;
+
+        const norm = filter.toLowerCase().trim();
+        if (norm === 'disney') return rawName.includes('disney');
+        if (norm === 'prime') return rawName.includes('prime') || rawName.includes('amazon');
+        if (norm === 'youtube') return rawName.includes('youtube');
+        return rawName.includes(norm);
+    }
+
     function renderCatalog() {
         catalogGrid.innerHTML = '';
         
@@ -194,10 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!item) return false;
                 const title = item.title || '';
                 if (searchQuery && !title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-                if (currentFilter !== 'all') {
-                    const serviceName = item.streaming_services?.name?.toLowerCase() || item.mock_service?.toLowerCase();
-                    if (serviceName !== currentFilter) return false;
-                }
+                if (!matchesServiceFilter(item, currentFilter)) return false;
                 return true;
             });
         } catch (e) {
@@ -263,26 +269,30 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const thumbsUpIds = userWatchlist
-            .filter(w => w.status === 'completed' && w.rating === 'thumbs_up')
+        // Recommend based on both currently watching shows and completed/liked shows
+        const targetIds = userWatchlist
+            .filter(w => (w.status === 'completed' && w.rating === 'thumbs_up') || w.status === 'watching')
             .map(w => w.content_item_id);
             
-        if (thumbsUpIds.length === 0) {
+        // Filter strictly to numeric TMDB IDs to avoid 404s on custom shows
+        const numericIds = targetIds.filter(id => /^\d+$/.test(String(id)));
+        if (numericIds.length === 0) {
             recommendations = [];
             return;
         }
 
         let allRecs = [];
-        // Only fetch recommendations for the last 3 liked shows to prevent API spam
-        for (const tmdbId of thumbsUpIds.slice(0, 3)) {
+        // Use up to 3 most relevant shows
+        for (const tmdbId of numericIds.slice(-3)) {
             try {
                 const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/recommendations?api_key=${cloudKey}&language=en-US&page=1`);
+                if (!res.ok) continue;
                 const data = await res.json();
-                if(data.results) {
+                if (data && data.results) {
                     allRecs = allRecs.concat(data.results);
                 }
             } catch (e) {
-                console.error("TMDB Rec Error", e);
+                console.warn("TMDB Recommendation fetch warning:", e);
             }
         }
 
@@ -291,11 +301,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const seenIds = new Set(allContent.map(c => String(c.id)));
         
         allRecs.forEach(rec => {
-            if (!seenIds.has(String(rec.id))) {
+            if (rec && rec.id && !seenIds.has(String(rec.id))) {
                 seenIds.add(String(rec.id));
                 uniqueRecs.push({
                     id: String(rec.id),
-                    title: rec.name,
+                    title: rec.name || 'Untitled',
                     release_year: rec.first_air_date ? rec.first_air_date.split('-')[0] : 'N/A',
                     poster_url: rec.poster_path ? `https://image.tmdb.org/t/p/w500${rec.poster_path}` : null,
                     mock_service: 'Recommended'
@@ -309,49 +319,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Actions ---
     async function updateWatchState(itemId, status, rating = null) {
-        if (!currentUser) {
-            alert("Please login to save changes.");
-            return;
-        }
-
-        const existing = userWatchlist.find(w => w.content_item_id === itemId);
+        const idStr = String(itemId);
+        const existing = userWatchlist.find(w => String(w.content_item_id) === idStr);
         if (existing) {
             existing.status = status;
             if (rating !== null) existing.rating = rating;
         } else {
-            userWatchlist.push({ content_item_id: itemId, status, rating });
+            userWatchlist.push({ content_item_id: idStr, status, rating });
         }
 
         renderAllSections();
-        if (status === 'completed' && rating === 'thumbs_up') {
+        if ((status === 'completed' && rating === 'thumbs_up') || status === 'watching') {
             await fetchRecommendations();
             renderRecommendations();
         }
 
-        await window.db.upsertWatchlistItem(currentUser.id, itemId, status, rating);
+        await window.db.upsertWatchlistItem(currentUser?.id || null, idStr, status, rating);
     }
 
     // --- Event Listeners ---
     function setupEventListeners() {
-        // Global Grid Click Listener for Status / Rating
+        // Global Grid Change Listener for Status Dropdown
         document.body.addEventListener('change', (e) => {
             if (e.target.classList.contains('status-dropdown')) {
                 const itemId = e.target.dataset.id;
                 const status = e.target.value;
-                // If they change away from completed, clear rating
-                const existing = userWatchlist.find(w => w.content_item_id === itemId);
+                const existing = userWatchlist.find(w => String(w.content_item_id) === String(itemId));
                 const currentRating = status === 'completed' ? (existing?.rating || null) : null;
                 updateWatchState(itemId, status, currentRating);
             }
         });
 
         document.body.addEventListener('click', async (e) => {
-            // Rating Buttons
+            // Rating Buttons (Thumbs Up / Down)
             if (e.target.classList.contains('rating-btn')) {
                 const itemId = e.target.dataset.id;
                 let rating = e.target.dataset.val;
                 
-                // Toggle off if clicking the active one
                 if (e.target.classList.contains('active')) {
                     rating = null; 
                 }
@@ -359,29 +363,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateWatchState(itemId, 'completed', rating);
             }
 
+            // Remove Show from Library
+            if (e.target.classList.contains('remove-btn')) {
+                const itemId = e.target.dataset.id;
+                const title = e.target.dataset.title || 'Show';
+                if (!confirm(`Are you sure you want to remove "${title}" from your library?`)) return;
+
+                const { error } = await window.db.deleteContentItem(itemId);
+                if (error) {
+                    showToast("Error removing show: " + error.message, 'error');
+                } else {
+                    allContent = allContent.filter(c => String(c.id) !== String(itemId));
+                    userWatchlist = userWatchlist.filter(w => String(w.content_item_id) !== String(itemId));
+                    await fetchRecommendations();
+                    renderAllSections();
+                    showToast(`Removed "${title}" from your library.`, 'info');
+                }
+            }
+
             // Quick Add from Recommendations
             if (e.target.classList.contains('add-rec-btn')) {
-                if (!currentUser) { alert("Login required"); return; }
                 const btn = e.target;
                 const payload = {
-                    id: btn.dataset.tmdbid,
+                    id: String(btn.dataset.tmdbid),
                     title: btn.dataset.title,
                     type: 'series_season',
                     release_year: parseInt(btn.dataset.year) || null,
                     poster_url: btn.dataset.poster,
-                    service_id: null
+                    service_id: null,
+                    mock_service: 'Recommended'
                 };
                 btn.textContent = "Adding...";
+                btn.disabled = true;
                 const { error } = await window.db.insertContentItem(payload);
                 if (!error) {
-                    allContent.push(payload);
+                    if (!allContent.some(c => String(c.id) === String(payload.id))) {
+                        allContent.push(payload);
+                    }
                     await updateWatchState(payload.id, 'want_to_watch', null);
-                    // fetchRecommendations will re-run removing it from recs since it's in library now
                     await fetchRecommendations();
                     renderAllSections();
+                    showToast(`Added "${payload.title}" to your library!`, 'success');
                 } else {
-                    alert("Error adding: " + error.message);
+                    showToast("Error adding recommendation: " + error.message, 'error');
                     btn.textContent = "Error";
+                    btn.disabled = false;
                 }
             }
         });
@@ -509,18 +535,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
         tmdbSearchBtn.addEventListener('click', async () => {
             const query = tmdbSearchQuery.value.trim();
-            const key = localStorage.getItem('tmdb_api_key');
-            if (!query || !key) return;
+            const key = await window.db.getSystemSetting('tmdb_api_key') || localStorage.getItem('tmdb_api_key');
+            
+            if (!key) {
+                showToast("Please set your TMDB API Key in Settings first.", 'error');
+                settingsModal.classList.remove('hidden');
+                return;
+            }
+            if (!query) {
+                showToast("Please enter a show title to search.", 'info');
+                return;
+            }
 
             tmdbSearchBtn.textContent = 'Searching...';
+            tmdbSearchBtn.disabled = true;
             try {
                 const res = await fetch(`https://api.themoviedb.org/3/search/tv?api_key=${key}&query=${encodeURIComponent(query)}`);
-                const data = await res.json();
-                renderTmdbResults(data.results || []);
+                if (!res.ok) {
+                    showToast("TMDB search failed. Please verify your API Key in Settings.", 'error');
+                } else {
+                    const data = await res.json();
+                    renderTmdbResults(data.results || []);
+                }
             } catch (e) {
                 console.error("TMDB Error", e);
+                showToast("Failed to connect to TMDB: " + e.message, 'error');
             }
             tmdbSearchBtn.textContent = 'Search';
+            tmdbSearchBtn.disabled = false;
         });
 
         // Custom Manual Add
@@ -530,35 +572,47 @@ document.addEventListener('DOMContentLoaded', () => {
             const service = customService.value;
 
             if (!title) {
-                alert("Please enter a title.");
+                showToast("Please enter a title.", 'error');
                 return;
             }
 
             const payload = {
-                id: 'custom_' + Date.now(), // Generate a unique ID for non-TMDB items
+                id: 'custom_' + Date.now(),
                 title: title,
                 type: 'series_season',
                 release_year: new Date().getFullYear(),
                 poster_url: poster,
                 service_id: null,
-                mock_service: service // Use mock_service for quick string display without joining tables
+                mock_service: service
             };
 
             customAddBtn.textContent = 'Adding...';
+            customAddBtn.disabled = true;
             const { error } = await window.db.insertContentItem(payload);
             
             if (error) {
-                alert("Error: " + error.message);
+                showToast("Error adding show: " + error.message, 'error');
                 customAddBtn.textContent = 'Add to Library';
+                customAddBtn.disabled = false;
             } else {
+                // Instantly update local in-memory catalog
+                if (!allContent.some(c => String(c.id) === String(payload.id))) {
+                    allContent.push(payload);
+                }
+                await updateWatchState(payload.id, 'want_to_watch', null);
+                renderAllSections();
+
                 customTitle.value = '';
                 customPoster.value = '';
-                customAddBtn.textContent = 'Added!';
+                customAddBtn.textContent = '✓ Added!';
                 customAddBtn.style.background = 'var(--success-color)';
+                showToast(`Added "${title}" to your library!`, 'success');
+                
                 setTimeout(() => {
                     customAddBtn.textContent = 'Add to Library';
                     customAddBtn.style.background = 'var(--accent-color)';
-                }, 2000);
+                    customAddBtn.disabled = false;
+                }, 1500);
             }
         });
     }
@@ -566,7 +620,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTmdbResults(results) {
         tmdbResultsGrid.innerHTML = '';
         if (results.length === 0) {
-            tmdbResultsGrid.innerHTML = '<p>No results found.</p>';
+            tmdbResultsGrid.innerHTML = '<p style="color: var(--text-muted); grid-column: 1 / -1;">No matching shows found.</p>';
             return;
         }
 
@@ -575,23 +629,29 @@ document.addEventListener('DOMContentLoaded', () => {
         results.slice(0, 12).forEach(item => {
             const poster = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/300x450/111111/fff?text=No+Image';
             const year = item.first_air_date ? item.first_air_date.split('-')[0] : 'TBA';
+            const cleanTitle = (item.name || 'Untitled').replace(/"/g, '&quot;');
             
             const card = document.createElement('div');
             card.className = 'tmdb-result-card';
             card.innerHTML = `
-                <img src="${poster}" class="tmdb-poster" alt="${item.name}">
+                <img src="${poster}" class="tmdb-poster" alt="${cleanTitle}" loading="lazy">
                 <div class="tmdb-info">
-                    <div class="tmdb-title">${item.name}</div>
+                    <div class="tmdb-title">${item.name || 'Untitled'}</div>
                     <div class="tmdb-year">${year}</div>
                     
-                    <label style="font-size: 0.8rem; margin-top: 10px;">Service</label>
+                    <label style="font-size: 0.8rem; margin-top: 5px;">Service</label>
                     <select class="admin-select-dropdown" id="service-${item.id}">
                         <option value="">None / Unknown</option>
                         ${serviceOptions}
                         <option value="youtube">YouTube TV</option>
+                        <option value="netflix">Netflix</option>
+                        <option value="disney">Disney+</option>
+                        <option value="peacock">Peacock</option>
+                        <option value="hulu">Hulu</option>
+                        <option value="prime">Prime Video</option>
                     </select>
 
-                    <button class="btn primary-btn add-supabase-btn" style="margin-top: 10px; width: 100%;" data-tmdb-id="${item.id}" data-title="${item.name.replace(/"/g, '&quot;')}" data-year="${year}" data-poster="${poster}">Add to Library</button>
+                    <button class="btn primary-btn add-supabase-btn" style="margin-top: 8px; width: 100%; font-size: 0.85rem;" data-tmdb-id="${item.id}" data-title="${cleanTitle}" data-year="${year}" data-poster="${poster}">+ Add to Library</button>
                 </div>
             `;
             tmdbResultsGrid.appendChild(card);
@@ -606,51 +666,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 const poster = btnEl.dataset.poster;
 
                 const serviceSelect = document.getElementById(`service-${tmdbId}`);
-                const serviceId = serviceSelect.value;
-                const serviceName = serviceSelect.options[serviceSelect.selectedIndex].text;
+                const serviceId = serviceSelect?.value || '';
+                const isCustomName = ['youtube', 'netflix', 'disney', 'peacock', 'hulu', 'prime'].includes(serviceId);
 
                 btnEl.textContent = 'Adding...';
                 btnEl.disabled = true;
 
                 const payload = {
-                    id: tmdbId.toString(),
+                    id: String(tmdbId),
                     title: title,
                     type: 'series_season',
                     release_year: parseInt(year) || null,
                     poster_url: poster,
-                    service_id: serviceId !== 'youtube' ? (serviceId || null) : null,
-                    mock_service: serviceId === 'youtube' ? 'youtube' : null // Override for custom networks not in DB
+                    service_id: isCustomName ? null : (serviceId || null),
+                    mock_service: isCustomName ? serviceId : null
                 };
 
                 const { error } = await window.db.insertContentItem(payload);
                 if (error) {
-                    alert("Error: " + error.message);
+                    showToast("Error adding show: " + error.message, 'error');
                     btnEl.textContent = 'Failed';
+                    btnEl.disabled = false;
                 } else {
-                    btnEl.textContent = 'Added!';
+                    // Instantly update local in-memory catalog
+                    if (!allContent.some(c => String(c.id) === String(payload.id))) {
+                        allContent.push(payload);
+                    }
+                    await updateWatchState(payload.id, 'want_to_watch', null);
+                    renderAllSections();
+
+                    btnEl.textContent = '✓ Added!';
                     btnEl.style.background = 'var(--success-color)';
+                    showToast(`Added "${title}" to your library!`, 'success');
                 }
             });
         });
-    }
-
-    // --- Mock Data Fallback ---
-    async function loadData() {
-        try {
-            const { data, error } = await window.db.getLibrary();
-            if (error) {
-                console.error("Error loading library:", error);
-                return;
-            }
-            if (data && data.length > 0) {
-                allContent = data;
-            } else {
-                allContent = [];
-            }
-            renderCatalog();
-            renderContinueWatching();
-            renderRecommendations();
-        } catch (e) {  }
     }
 
     // Boot

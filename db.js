@@ -76,70 +76,234 @@ const db = {
         } catch(e) { return []; }
     },
 
-    async getContentItems() {
-        if (!supabaseClient) return [];
+    // LocalStorage Fallback Helpers
+    getLocalLibrary() {
         try {
-            const { data, error } = await supabaseClient
-                .from('content_items')
-                .select(`
-                    *,
-                    streaming_services ( name, icon_url ),
-                    franchises ( name )
-                `)
-                .order('title', { ascending: true });
-            
-            if (error) console.error("Error fetching content items:", error);
-            return data || [];
-        } catch(e) { return []; }
+            return JSON.parse(localStorage.getItem('tv_hub_custom_library') || '[]');
+        } catch (e) { return []; }
+    },
+
+    saveLocalLibrary(items) {
+        try {
+            localStorage.setItem('tv_hub_custom_library', JSON.stringify(items));
+        } catch (e) {}
+    },
+
+    getLocalWatchlist() {
+        try {
+            return JSON.parse(localStorage.getItem('tv_hub_watchlist') || '[]');
+        } catch (e) { return []; }
+    },
+
+    saveLocalWatchlist(items) {
+        try {
+            localStorage.setItem('tv_hub_watchlist', JSON.stringify(items));
+        } catch (e) {}
+    },
+
+    async getContentItems() {
+        let remoteItems = [];
+        if (supabaseClient) {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('content_items')
+                    .select(`
+                        *,
+                        streaming_services ( name, icon_url ),
+                        franchises ( name )
+                    `)
+                    .order('title', { ascending: true });
+                
+                if (error) console.error("Error fetching content items:", error);
+                else if (data) remoteItems = data;
+            } catch(e) {
+                console.warn("Supabase fetch failed, using local storage fallback", e);
+            }
+        }
+
+        // Merge remote items with local offline library items
+        const localItems = this.getLocalLibrary();
+        const mergedMap = new Map();
+        
+        remoteItems.forEach(item => mergedMap.set(String(item.id), item));
+        localItems.forEach(item => {
+            if (!mergedMap.has(String(item.id))) {
+                mergedMap.set(String(item.id), item);
+            }
+        });
+
+        return Array.from(mergedMap.values());
     },
 
     async getUserWatchlist(userId) {
-        if (!userId || !supabaseClient) return [];
-        try {
-            const { data, error } = await supabaseClient
-                .from('user_watchlist')
-                .select('*')
-                .eq('user_id', userId);
-            
-            if (error) console.error("Error fetching watchlist:", error);
-            return data || [];
-        } catch(e) { return []; }
+        let remoteList = [];
+        if (userId && supabaseClient) {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('user_watchlist')
+                    .select('*')
+                    .eq('user_id', userId);
+                
+                if (error) console.error("Error fetching watchlist:", error);
+                else if (data) remoteList = data;
+            } catch(e) {
+                console.warn("Watchlist fetch failed, using local fallback", e);
+            }
+        }
+
+        // Merge with local offline watchlist
+        const localList = this.getLocalWatchlist();
+        const watchlistMap = new Map();
+        remoteList.forEach(w => watchlistMap.set(String(w.content_item_id), w));
+        localList.forEach(w => {
+            if (!watchlistMap.has(String(w.content_item_id))) {
+                watchlistMap.set(String(w.content_item_id), w);
+            }
+        });
+
+        return Array.from(watchlistMap.values());
     },
 
     // Updates
     async upsertWatchlistItem(userId, contentItemId, status, rating = null) {
-        if (!userId) return { error: new Error('User not logged in') };
+        // Always persist to local storage for immediate responsiveness & guest support
+        const localList = this.getLocalWatchlist();
+        const existingIdx = localList.findIndex(w => String(w.content_item_id) === String(contentItemId));
+        const updatedEntry = {
+            user_id: userId || 'guest',
+            content_item_id: String(contentItemId),
+            status: status,
+            rating: rating,
+            updated_at: new Date().toISOString()
+        };
+
+        if (existingIdx >= 0) {
+            localList[existingIdx] = updatedEntry;
+        } else {
+            localList.push(updatedEntry);
+        }
+        this.saveLocalWatchlist(localList);
+
+        if (!userId || !supabaseClient) {
+            return { data: [updatedEntry], error: null };
+        }
         
-        const { data, error } = await supabaseClient
-            .from('user_watchlist')
-            .upsert({ 
-                user_id: userId, 
-                content_item_id: contentItemId, 
-                status: status,
-                rating: rating,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id,content_item_id' })
-            .select();
-            
-        if (error) console.error("Error upserting watchlist item:", error);
-        return { data, error };
+        try {
+            const { data, error } = await supabaseClient
+                .from('user_watchlist')
+                .upsert({ 
+                    user_id: userId, 
+                    content_item_id: contentItemId, 
+                    status: status,
+                    rating: rating,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id,content_item_id' })
+                .select();
+                
+            if (error) console.error("Error upserting watchlist item:", error);
+            return { data, error };
+        } catch (e) {
+            return { data: [updatedEntry], error: e };
+        }
     },
 
-    // Admin Tools
+    // Delete / Remove Item from Library & Watchlist
+    async deleteContentItem(contentItemId) {
+        const idStr = String(contentItemId);
+        
+        // Remove from local library
+        const localLib = this.getLocalLibrary().filter(item => String(item.id) !== idStr);
+        this.saveLocalLibrary(localLib);
+
+        // Remove from local watchlist
+        const localWatchlist = this.getLocalWatchlist().filter(w => String(w.content_item_id) !== idStr);
+        this.saveLocalWatchlist(localWatchlist);
+
+        let error = null;
+        if (supabaseClient) {
+            try {
+                // Delete from user_watchlist first (foreign key reference)
+                await supabaseClient.from('user_watchlist').delete().eq('content_item_id', contentItemId);
+                // Delete from content_items
+                const res = await supabaseClient.from('content_items').delete().eq('id', contentItemId);
+                error = res.error;
+            } catch (e) {
+                error = e;
+            }
+        }
+        return { error };
+    },
+
+    async deleteWatchlistItem(userId, contentItemId) {
+        const idStr = String(contentItemId);
+        const localList = this.getLocalWatchlist().filter(w => String(w.content_item_id) !== idStr);
+        this.saveLocalWatchlist(localList);
+
+        if (userId && supabaseClient) {
+            try {
+                const { error } = await supabaseClient
+                    .from('user_watchlist')
+                    .delete()
+                    .eq('user_id', userId)
+                    .eq('content_item_id', contentItemId);
+                return { error };
+            } catch (e) {
+                return { error: e };
+            }
+        }
+        return { error: null };
+    },
+
+    // Admin & Content Tools
     async insertContentItem(itemData) {
-        if (!supabaseClient) return { error: new Error('Supabase client not initialized') };
+        // Save to local library immediately
+        const localLib = this.getLocalLibrary();
+        const idStr = String(itemData.id);
+        const existingIdx = localLib.findIndex(item => String(item.id) === idStr);
+        if (existingIdx >= 0) {
+            localLib[existingIdx] = itemData;
+        } else {
+            localLib.push(itemData);
+        }
+        this.saveLocalLibrary(localLib);
+
+        if (!supabaseClient) {
+            return { data: [itemData], error: null };
+        }
         
-        // Ensure the ID is unique or generated by Supabase if omitted.
-        // Assuming TMDB ID can be used or we let Supabase create a UUID.
-        // If we use TMDB id, we should pass it. Let's pass the payload directly.
-        
-        const { data, error } = await supabaseClient
-            .from('content_items')
-            .upsert(itemData, { onConflict: 'id' })
-            .select();
-            
-        if (error) console.error("Error inserting content item:", error);
-        return { data, error };
+        try {
+            const { data, error } = await supabaseClient
+                .from('content_items')
+                .upsert(itemData, { onConflict: 'id' })
+                .select();
+                
+            if (error) console.error("Error inserting content item into Supabase:", error);
+            return { data: data || [itemData], error };
+        } catch (e) {
+            return { data: [itemData], error: e };
+        }
+    },
+
+    async syncLocalStorageToCloud(userId) {
+        if (!userId || !supabaseClient) return;
+        try {
+            const localLib = this.getLocalLibrary();
+            for (const item of localLib) {
+                await supabaseClient.from('content_items').upsert(item, { onConflict: 'id' });
+            }
+            const localWatch = this.getLocalWatchlist();
+            for (const watch of localWatch) {
+                await supabaseClient.from('user_watchlist').upsert({
+                    user_id: userId,
+                    content_item_id: watch.content_item_id,
+                    status: watch.status,
+                    rating: watch.rating,
+                    updated_at: watch.updated_at || new Date().toISOString()
+                }, { onConflict: 'user_id,content_item_id' });
+            }
+        } catch (e) {
+            console.warn("Cloud sync warning:", e);
+        }
     },
 
     async getSystemSetting(key) {

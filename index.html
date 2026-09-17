@@ -6,17 +6,18 @@
     <title>Seelye TV Hub</title>
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=0.5.1">
+    <link rel="stylesheet" href="style.css?v=0.6.0">
 </head>
 <body>
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
     <header class="site-header">
         <div class="logo">
             <h1>Seelye TV Hub</h1>
             <span class="domain">tv.seelye.info</span>
         </div>
         <div class="auth-section">
-            <button id="add-shows-btn" class="btn secondary-btn hidden" style="margin-right: 10px;">+ Add Shows</button>
-            <button id="settings-btn" class="btn secondary-btn hidden" style="margin-right: 10px;">Settings</button>
+            <button id="add-shows-btn" class="btn secondary-btn" style="margin-right: 10px;">+ Add Shows</button>
+            <button id="settings-btn" class="btn secondary-btn" style="margin-right: 10px;">Settings</button>
             <span id="auth-status-badge" class="auth-badge">Checking auth...</span>
             <button id="auth-btn" class="btn primary-btn">Login</button>
         </div>
@@ -69,11 +70,12 @@
 
     <footer class="site-footer">
         <div class="version-info">
-            <strong>Version: Beta 0.5.0</strong>
+            <strong>Version: Beta 0.6.0</strong>
         </div>
         <div class="changelog">
             <h3>Version History</h3>
             <ul>
+                <li><strong>Beta 0.6.0</strong> - Comprehensive Audit & Overhaul: Fixed live catalog render on show addition, normalized streaming service filters, added show deletion/removal, resilient offline/guest storage sync, and repaired modal layout structures.</li>
                 <li><strong>Beta 0.5.0</strong> - Pivot to Smart Watchlist: Added "Continue Watching", "Recommended For You", Custom YouTube TV additions, and Status Tracking.</li>
                 <li><strong>Beta 0.4.1</strong> - Converted Admin Panel to a clean Modal UI overlay to fix catalog visibility bugs.</li>
                 <li><strong>Beta 0.4.0</strong> - Implemented Cloud System Settings syncing.</li>
@@ -81,12 +83,6 @@
         </div>
     </footer>
 
-    <!-- Admin Modal -->
-    <div id="admin-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;">
-            <div class="admin-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 15px; margin-bottom: 20px;">
-                <h2 style="margin: 0;">Admin Tools: Add Shows</h2>
-                <button id="close-admin-btn" class="btn secondary-btn" style="background: transparent; color: white; font-size: 1.5rem; padding: 0 10px; border: none;">&times;</button>
     <!-- Add Shows Modal -->
     <div id="add-shows-modal" class="modal hidden">
         <div class="modal-content admin-content">
@@ -180,7 +176,7 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="db.js?v=0.5.0"></script>
-    <script src="app.js?v=0.5.0"></script>
+    <script src="db.js?v=0.6.0"></script>
+    <script src="app.js?v=0.6.0"></script>
 </body>
 </html>
