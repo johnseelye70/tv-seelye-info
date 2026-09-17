@@ -6,7 +6,7 @@
     <title>Seelye TV Hub</title>
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=0.10.0">
+    <link rel="stylesheet" href="style.css?v=0.11.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -155,11 +155,12 @@
 
     <footer class="site-footer">
         <div class="version-info">
-            <strong>Version: Beta 0.10.0</strong>
+            <strong>Version: Beta 0.11.0</strong>
         </div>
         <div class="changelog">
             <h3>Version History</h3>
             <ul>
+                <li><strong>Beta 0.11.0</strong> - IMDb Show Details Pop-up Modal: Decoupled show addition from card clicking so shows are only added via the explicit "+ Add to Library" button. Clicking any show's picture opens a dedicated IMDb pop-up modal over the screen with full plot synopses, cast, seasons, ratings, direct IMDb link, and an interactive "x" close button.</li>
                 <li><strong>Beta 0.10.0</strong> - Apple TV+ Streaming Option: Integrated Apple TV+ across the application including personal library provider filters, explore streaming services discovery with acclaimed hits (Ted Lasso, Severance, Silo, Slow Horses, and more), taste profile analysis, and TMDB addition.</li>
                 <li><strong>Beta 0.9.0</strong> - Architecture & Smart Recommendations Overhaul: Separated personal My Library from Explore Streaming Services into dedicated inline views with real-time counters and status filters. Added multi-vector intelligent recommendation engine analyzing watch history, thumbs-up ratings, and genre profiles with contextual rationale badges.</li>
                 <li><strong>Beta 0.8.0</strong> - Streaming Service Discovery: Clicking any streaming service (Netflix, Disney+, Peacock, Hulu, Prime Video, YouTube TV) instantly displays currently popular and classic shows for that service with one-click library addition.</li>
@@ -249,6 +250,16 @@
         </div>
     </div>
 
+    <!-- IMDb Show Details Pop-up Modal -->
+    <div id="imdb-modal" class="modal imdb-modal hidden" style="z-index: 2100;" aria-modal="true" role="dialog">
+        <div class="modal-content imdb-modal-content">
+            <span class="close-btn close-imdb-btn" id="close-imdb-modal-btn" title="Close details">&times;</span>
+            <div id="imdb-modal-body">
+                <!-- Loaded dynamically via openImdbModal() -->
+            </div>
+        </div>
+    </div>
+
     <!-- Login Modal -->
     <div id="login-modal" class="modal hidden">
         <div class="modal-content">
@@ -276,8 +287,8 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=0.10.0"></script>
-    <script src="db.js?v=0.10.0"></script>
-    <script src="app.js?v=0.10.0"></script>
+    <script src="service_catalog.js?v=0.11.0"></script>
+    <script src="db.js?v=0.11.0"></script>
+    <script src="app.js?v=0.11.0"></script>
 </body>
 </html>

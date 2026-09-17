@@ -71,6 +71,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const serviceDiscoveryTitle = document.getElementById('service-discovery-title');
     const serviceDiscoverySubtitle = document.getElementById('service-discovery-subtitle');
     const quickServiceRow = document.getElementById('quick-service-row');
+    const imdbModal = document.getElementById('imdb-modal');
+    const closeImdbModalBtn = document.getElementById('close-imdb-modal-btn');
+    const imdbModalBody = document.getElementById('imdb-modal-body');
 
     const serviceMeta = {
         netflix: { name: 'Netflix', networkId: '213' },
@@ -517,6 +520,281 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSmartRecommendationsView();
     }
 
+    // --- IMDb Pop-up Modal System ---
+    function closeImdbModal() {
+        if (!imdbModal) return;
+        imdbModal.classList.add('hidden');
+        if (imdbModalBody) {
+            imdbModalBody.innerHTML = '';
+        }
+    }
+    window.closeImdbModal = closeImdbModal;
+
+    async function openImdbModal(item) {
+        if (!imdbModal || !imdbModalBody) return;
+        imdbModal.classList.remove('hidden');
+
+        const fallbackPoster = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='450' viewBox='0 0 300 450'%3E%3Crect width='300' height='450' fill='%231e1e1e'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23666' font-family='sans-serif' font-size='16'%3ENo Poster%3C/text%3E%3C/svg%3E";
+        const title = item.title || item.name || 'Show Details';
+        const cleanTitle = title.replace(/"/g, '&quot;');
+        const rawPoster = item.poster || item.poster_path;
+        const initialPoster = rawPoster ? (rawPoster.startsWith('http') ? rawPoster : `https://image.tmdb.org/t/p/w500${rawPoster}`) : fallbackPoster;
+        const initialYear = item.year || (item.first_air_date ? item.first_air_date.split('-')[0] : '');
+        const tmdbId = String(item.id || item.tmdb_id || '');
+
+        // Loading state
+        imdbModalBody.innerHTML = `
+            <div style="padding: 50px 20px; text-align: center;">
+                <div class="skeleton-loader" style="width: 140px; height: 32px; margin: 0 auto 16px auto; border-radius: 6px;"></div>
+                <h3 style="margin-bottom: 8px; font-size: 1.4rem;">${cleanTitle}</h3>
+                <p style="color: var(--text-muted); font-size: 0.95rem;">Retrieving official IMDb synopsis, ratings, and cast details...</p>
+                <div class="skeleton-loader" style="width: 80%; max-width: 500px; height: 18px; margin: 25px auto 10px auto; border-radius: 4px;"></div>
+                <div class="skeleton-loader" style="width: 65%; max-width: 400px; height: 18px; margin: 0 auto; border-radius: 4px;"></div>
+            </div>
+        `;
+
+        let details = null;
+        let imdbId = null;
+        const key = await window.db.getSystemSetting('tmdb_api_key') || localStorage.getItem('tmdb_api_key');
+
+        if (key && tmdbId && !tmdbId.startsWith('custom_')) {
+            try {
+                let res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${key}&append_to_response=external_ids,credits,content_ratings`);
+                if (res.ok) {
+                    details = await res.json();
+                    imdbId = details.external_ids?.imdb_id || null;
+                } else {
+                    res = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${key}&append_to_response=external_ids,credits,release_dates`);
+                    if (res.ok) {
+                        details = await res.json();
+                        imdbId = details.external_ids?.imdb_id || null;
+                    }
+                }
+            } catch (err) {
+                console.warn("Failed fetching full TMDB details:", err);
+            }
+        }
+
+        const imdbUrl = imdbId 
+            ? `https://www.imdb.com/title/${imdbId}/` 
+            : `https://www.imdb.com/find/?q=${encodeURIComponent(title)}`;
+            
+        const ratingVal = details?.vote_average 
+            ? (Math.round(details.vote_average * 10) / 10) 
+            : (item.rating || 8.0);
+            
+        const voteCount = details?.vote_count 
+            ? Number(details.vote_count).toLocaleString() 
+            : '';
+            
+        const yearVal = details?.first_air_date 
+            ? details.first_air_date.split('-')[0] 
+            : (details?.release_date ? details.release_date.split('-')[0] : (initialYear || 'TBA'));
+            
+        const posterImg = details?.poster_path 
+            ? `https://image.tmdb.org/t/p/w500${details.poster_path}` 
+            : initialPoster;
+            
+        const backdropImg = details?.backdrop_path 
+            ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}` 
+            : '';
+            
+        const overview = details?.overview || item.overview || 'No synopsis provided.';
+        const tagline = details?.tagline ? `"${details.tagline}"` : '';
+        const genres = details?.genres ? details.genres.map(g => g.name) : (inferGenresFromTitleAndOverview(title, overview));
+        
+        let seasonsText = '';
+        if (details?.number_of_seasons) {
+            seasonsText = `${details.number_of_seasons} Season${details.number_of_seasons === 1 ? '' : 's'}`;
+            if (details.number_of_episodes) seasonsText += ` (${details.number_of_episodes} eps)`;
+        }
+
+        let contentRating = '';
+        if (details?.content_ratings?.results) {
+            const usRating = details.content_ratings.results.find(r => r.iso_3166_1 === 'US')?.rating;
+            if (usRating) contentRating = usRating;
+        }
+
+        const castList = details?.credits?.cast?.slice(0, 8) || [];
+        const creators = details?.created_by?.map(c => c.name).join(', ') || '';
+        const networks = details?.networks?.map(n => n.name).join(', ') || (serviceMeta[item.service]?.name || item.service || '');
+        const status = details?.status || '';
+
+        const uuid = window.db?.toDeterministicUuid ? window.db.toDeterministicUuid(tmdbId) : tmdbId;
+        const isAlreadyInLib = allContent.some(c => 
+            String(c.id) === uuid || 
+            String(c.tmdb_id) === tmdbId || 
+            String(c.id) === tmdbId || 
+            (c.title && c.title.toLowerCase() === title.toLowerCase())
+        );
+
+        imdbModalBody.innerHTML = `
+            <div class="imdb-hero" style="${backdropImg ? `background-image: url('${backdropImg}');` : 'background: #1e1e1e;'}">
+                <div class="imdb-hero-overlay"></div>
+                <div class="imdb-hero-content">
+                    <img src="${posterImg}" class="imdb-poster-thumb" alt="${cleanTitle}" onerror="this.onerror=null;this.src='${fallbackPoster}';">
+                    <div class="imdb-meta-summary">
+                        <div class="imdb-rating-badge">
+                            <span class="imdb-gold-pill">IMDb</span>
+                            <span class="imdb-rating-val">★ ${ratingVal} <small style="color:var(--text-muted); font-size:0.75rem;">/10</small></span>
+                            ${voteCount ? `<span class="imdb-rating-votes">(${voteCount})</span>` : ''}
+                        </div>
+                        <h2 class="imdb-show-title">${title}</h2>
+                        <div class="imdb-show-submeta">
+                            <span>${yearVal}</span>
+                            ${contentRating ? `<span class="imdb-submeta-dot">•</span><span style="border:1px solid rgba(255,255,255,0.3); padding:1px 5px; border-radius:3px; font-size:0.78rem;">${contentRating}</span>` : ''}
+                            ${seasonsText ? `<span class="imdb-submeta-dot">•</span><span>${seasonsText}</span>` : ''}
+                            ${genres.length > 0 ? `<span class="imdb-submeta-dot">•</span><span>${genres.slice(0, 3).join(', ')}</span>` : ''}
+                        </div>
+                        <div class="imdb-action-row">
+                            <a href="${imdbUrl}" target="_blank" rel="noopener noreferrer" class="imdb-visit-btn" id="imdb-direct-link">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0;">
+                                    <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                                </svg>
+                                <span>View on IMDb.com ↗</span>
+                            </a>
+                            <button class="btn primary-btn" id="imdb-modal-add-btn" style="padding: 8px 18px; font-size: 0.9rem;" ${isAlreadyInLib ? 'disabled style="background:var(--success-color);"' : ''}>
+                                ${isAlreadyInLib ? '✓ In Library' : '+ Add to Library'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="imdb-body-content">
+                <div class="imdb-tabs">
+                    <button type="button" class="imdb-tab-btn active" data-tab="overview">Show Overview & Cast</button>
+                    <button type="button" class="imdb-tab-btn" data-tab="webview">IMDb Web Preview</button>
+                </div>
+
+                <div id="imdb-tab-overview" class="imdb-tab-panel">
+                    <div class="imdb-info-grid">
+                        <div>
+                            ${tagline ? `<div class="imdb-tagline">${tagline}</div>` : ''}
+                            <div class="imdb-section-title">Synopsis</div>
+                            <p class="imdb-synopsis">${overview}</p>
+
+                            ${castList.length > 0 ? `
+                                <div class="imdb-section-title">Top Billed Cast</div>
+                                <div class="imdb-cast-list">
+                                    ${castList.map(actor => `
+                                        <div class="imdb-cast-chip">
+                                            <strong>${actor.name}</strong>
+                                            ${actor.character ? `<span class="imdb-cast-character"> as ${actor.character}</span>` : ''}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <div>
+                            ${creators ? `
+                                <div class="imdb-side-fact">
+                                    <div class="imdb-side-fact-label">Creator${creators.includes(',') ? 's' : ''}</div>
+                                    <div class="imdb-side-fact-val">${creators}</div>
+                                </div>
+                            ` : ''}
+                            ${networks ? `
+                                <div class="imdb-side-fact">
+                                    <div class="imdb-side-fact-label">Original Network / Service</div>
+                                    <div class="imdb-side-fact-val">${networks}</div>
+                                </div>
+                            ` : ''}
+                            ${status ? `
+                                <div class="imdb-side-fact">
+                                    <div class="imdb-side-fact-label">Status</div>
+                                    <div class="imdb-side-fact-val">${status}</div>
+                                </div>
+                            ` : ''}
+                            ${genres.length > 0 ? `
+                                <div class="imdb-side-fact">
+                                    <div class="imdb-side-fact-label">Genres</div>
+                                    <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
+                                        ${genres.map(g => `<span class="genre-chip" style="font-size:0.75rem; padding:3px 8px;">${g}</span>`).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+
+                <div id="imdb-tab-webview" class="imdb-tab-panel" style="display: none;">
+                    <div style="padding: 12px 16px; background: rgba(245, 197, 24, 0.08); border: 1px solid rgba(245, 197, 24, 0.3); border-radius: 8px; margin-bottom: 14px;">
+                        <p style="margin: 0; font-size: 0.88rem; color: var(--text-main);">
+                            ℹ️ <em>If IMDb does not display below due to browser cross-origin frame protection, click the yellow <strong>"View on IMDb.com ↗"</strong> button above to open the full page directly.</em>
+                        </p>
+                    </div>
+                    <div class="imdb-iframe-container">
+                        <iframe src="${imdbUrl}" class="imdb-iframe" title="IMDb - ${cleanTitle}" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const tabBtns = imdbModalBody.querySelectorAll('.imdb-tab-btn');
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                tabBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const targetTab = btn.dataset.tab;
+                const pOverview = document.getElementById('imdb-tab-overview');
+                const pWebview = document.getElementById('imdb-tab-webview');
+                if (pOverview) pOverview.style.display = targetTab === 'overview' ? 'block' : 'none';
+                if (pWebview) pWebview.style.display = targetTab === 'webview' ? 'block' : 'none';
+            });
+        });
+
+        const modalAddBtn = document.getElementById('imdb-modal-add-btn');
+        if (modalAddBtn && !isAlreadyInLib) {
+            modalAddBtn.addEventListener('click', async () => {
+                modalAddBtn.textContent = 'Adding...';
+                modalAddBtn.disabled = true;
+
+                const svcName = item.service ? (serviceMeta[item.service]?.name || item.service) : 'Custom';
+                const payload = {
+                    id: uuid,
+                    tmdb_id: tmdbId,
+                    title: title,
+                    type: 'series_season',
+                    release_year: parseInt(yearVal) || null,
+                    poster_url: posterImg,
+                    streaming_service_id: null,
+                    mock_service: svcName
+                };
+
+                const { data, error } = await window.db.insertContentItem(payload);
+                if (error) {
+                    showToast('Error adding show: ' + error.message, 'error');
+                    modalAddBtn.textContent = '+ Add to Library';
+                    modalAddBtn.disabled = false;
+                } else {
+                    const savedItem = (data && data[0]) ? data[0] : payload;
+                    if (!allContent.some(c => String(c.id) === String(savedItem.id))) {
+                        allContent.push(savedItem);
+                    }
+                    await updateWatchState(savedItem.id, 'want_to_watch', null);
+                    renderAllSections();
+
+                    modalAddBtn.textContent = '✓ Added!';
+                    modalAddBtn.style.background = 'var(--success-color)';
+                    modalAddBtn.disabled = true;
+
+                    document.querySelectorAll(`.tmdb-result-card[data-tmdb-id="${tmdbId}"]`).forEach(cEl => {
+                        cEl.classList.add('already-in-library');
+                        const btn = cEl.querySelector('.add-supabase-btn, .add-discovery-btn, .add-smart-rec-btn');
+                        if (btn) {
+                            btn.textContent = '✓ In Library';
+                            btn.disabled = true;
+                        }
+                    });
+
+                    showToast(`Added "${payload.title}" to your library!`, 'success');
+                }
+            });
+        }
+    }
+    window.openImdbModal = openImdbModal;
+
     // --- Service Discovery Logic ---
     async function renderServiceDiscovery(service, forceRefresh = false) {
         if (!serviceDiscoveryContainer || !serviceDiscoveryGrid) return;
@@ -664,14 +942,12 @@ document.addEventListener('DOMContentLoaded', () => {
             card.className = `tmdb-result-card ${isAlreadyInLib ? 'already-in-library' : ''}`;
             card.dataset.tmdbId = tmdbId;
             card.dataset.title = showName;
-            card.setAttribute('role', 'button');
-            card.setAttribute('tabindex', '0');
-            card.setAttribute('title', `Click to add "${cleanTitle}" to your library`);
 
             card.innerHTML = `
-                <div class="tmdb-poster-container">
+                <div class="tmdb-poster-container" title="Click to view IMDb details" role="button" tabindex="0">
                     <img src="${poster}" class="tmdb-poster" alt="${cleanTitle}" loading="lazy" onerror="this.onerror=null;this.src='${fallbackPoster}';">
-                    ${isAlreadyInLib ? '<span class="tmdb-badge-in-lib">✓ In Library</span>' : '<span class="tmdb-badge-add">+ Click to Add</span>'}
+                    ${isAlreadyInLib ? '<span class="tmdb-badge-in-lib">✓ In Library</span>' : ''}
+                    <span class="tmdb-badge-imdb-hint">IMDb Details ↗</span>
                 </div>
                 <div class="tmdb-info">
                     <div class="tmdb-title" title="${cleanTitle}">${showName}</div>
@@ -739,27 +1015,39 @@ document.addEventListener('DOMContentLoaded', () => {
                         btnEl.style.background = 'var(--success-color)';
                         btnEl.disabled = true;
                     }
-                    const badge = card.querySelector('.tmdb-badge-add');
-                    if (badge) {
-                        badge.className = 'tmdb-badge-in-lib';
-                        badge.textContent = '✓ In Library';
+                    const badge = card.querySelector('.tmdb-badge-in-lib');
+                    if (!badge) {
+                        const newBadge = document.createElement('span');
+                        newBadge.className = 'tmdb-badge-in-lib';
+                        newBadge.textContent = '✓ In Library';
+                        card.querySelector('.tmdb-poster-container')?.prepend(newBadge);
                     }
                     showToast(`Added "${payload.title}" to your library!`, 'success');
                 }
             };
 
-            card.addEventListener('click', (e) => {
-                const btnEl = card.querySelector('.add-discovery-btn');
-                handleAddShow(btnEl);
-            });
+            const posterContainer = card.querySelector('.tmdb-poster-container');
+            if (posterContainer) {
+                posterContainer.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openImdbModal({ ...item, title: showName, poster, year, service: currentDiscoveryService });
+                });
+                posterContainer.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openImdbModal({ ...item, title: showName, poster, year, service: currentDiscoveryService });
+                    }
+                });
+            }
 
-            card.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    const btnEl = card.querySelector('.add-discovery-btn');
-                    handleAddShow(btnEl);
-                }
-            });
+            const addBtn = card.querySelector('.add-discovery-btn');
+            if (addBtn) {
+                addBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    handleAddShow(addBtn);
+                });
+            }
 
             serviceDiscoveryGrid.appendChild(card);
         });
@@ -1043,14 +1331,12 @@ document.addEventListener('DOMContentLoaded', () => {
         card.className = `tmdb-result-card ${isAlreadyInLib ? 'already-in-library' : ''}`;
         card.dataset.tmdbId = tmdbId;
         card.dataset.title = item.title || '';
-        card.setAttribute('role', 'button');
-        card.setAttribute('tabindex', '0');
-        card.setAttribute('title', `Click to add "${cleanTitle}" to your library`);
 
         card.innerHTML = `
-            <div class="tmdb-poster-container">
+            <div class="tmdb-poster-container" title="Click to view IMDb details" role="button" tabindex="0">
                 <img src="${poster}" class="tmdb-poster" alt="${cleanTitle}" loading="lazy" onerror="this.onerror=null;this.src='${fallbackPoster}';">
-                ${isAlreadyInLib ? '<span class="tmdb-badge-in-lib">✓ In Library</span>' : '<span class="tmdb-badge-add">+ Click to Add</span>'}
+                ${isAlreadyInLib ? '<span class="tmdb-badge-in-lib">✓ In Library</span>' : ''}
+                <span class="tmdb-badge-imdb-hint">IMDb Details ↗</span>
             </div>
             <div class="tmdb-info">
                 <span class="rec-reason-badge">${item.reason}</span>
@@ -1119,28 +1405,40 @@ document.addEventListener('DOMContentLoaded', () => {
                     btnEl.style.background = 'var(--success-color)';
                     btnEl.disabled = true;
                 }
-                const badge = card.querySelector('.tmdb-badge-add');
-                if (badge) {
-                    badge.className = 'tmdb-badge-in-lib';
-                    badge.textContent = '✓ In Library';
+                const badge = card.querySelector('.tmdb-badge-in-lib');
+                if (!badge) {
+                    const newBadge = document.createElement('span');
+                    newBadge.className = 'tmdb-badge-in-lib';
+                    newBadge.textContent = '✓ In Library';
+                    card.querySelector('.tmdb-poster-container')?.prepend(newBadge);
                 }
                 updateLibraryCounters();
                 showToast(`Added "${payload.title}" to your library!`, 'success');
             }
         };
 
-        card.addEventListener('click', (e) => {
-            const btnEl = card.querySelector('.add-smart-rec-btn');
-            handleAdd(btnEl);
-        });
+        const posterContainer = card.querySelector('.tmdb-poster-container');
+        if (posterContainer) {
+            posterContainer.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openImdbModal({ ...item, title: item.title, poster, year, rating, service: item.service });
+            });
+            posterContainer.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openImdbModal({ ...item, title: item.title, poster, year, rating, service: item.service });
+                }
+            });
+        }
 
-        card.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                const btnEl = card.querySelector('.add-smart-rec-btn');
-                handleAdd(btnEl);
-            }
-        });
+        const addBtn = card.querySelector('.add-smart-rec-btn');
+        if (addBtn) {
+            addBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleAdd(addBtn);
+            });
+        }
 
         return card;
     }
@@ -1381,6 +1679,28 @@ document.addEventListener('DOMContentLoaded', () => {
             settingsModal.classList.add('hidden');
         });
 
+        if (closeImdbModalBtn) {
+            closeImdbModalBtn.addEventListener('click', () => {
+                closeImdbModal();
+            });
+        }
+
+        if (imdbModal) {
+            imdbModal.addEventListener('click', (e) => {
+                if (e.target === imdbModal) {
+                    closeImdbModal();
+                }
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (imdbModal && !imdbModal.classList.contains('hidden')) {
+                    closeImdbModal();
+                }
+            }
+        });
+
         saveTmdbKeyBtn.addEventListener('click', async () => {
             const key = tmdbApiKeyInput.value.trim();
             if (key) {
@@ -1533,14 +1853,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const card = document.createElement('div');
             card.className = `tmdb-result-card ${isAlreadyInLib ? 'already-in-library' : ''}`;
-            card.setAttribute('role', 'button');
-            card.setAttribute('tabindex', '0');
-            card.setAttribute('title', `Click to add "${cleanTitle}" to your library`);
+            card.dataset.tmdbId = tmdbId;
+            card.dataset.title = showName;
 
             card.innerHTML = `
-                <div class="tmdb-poster-container">
+                <div class="tmdb-poster-container" title="Click to view IMDb details" role="button" tabindex="0">
                     <img src="${poster}" class="tmdb-poster" alt="${cleanTitle}" loading="lazy" onerror="this.onerror=null;this.src='${fallbackPoster}';">
-                    ${isAlreadyInLib ? '<span class="tmdb-badge-in-lib">✓ In Library</span>' : '<span class="tmdb-badge-add">+ Click to Add</span>'}
+                    ${isAlreadyInLib ? '<span class="tmdb-badge-in-lib">✓ In Library</span>' : ''}
+                    <span class="tmdb-badge-imdb-hint">IMDb Details ↗</span>
                 </div>
                 <div class="tmdb-info">
                     <div class="tmdb-title" title="${cleanTitle}">${showName}</div>
@@ -1621,31 +1941,65 @@ document.addEventListener('DOMContentLoaded', () => {
                         btnEl.style.background = 'var(--success-color)';
                         btnEl.disabled = true;
                     }
-                    const badge = card.querySelector('.tmdb-badge-add');
-                    if (badge) {
-                        badge.className = 'tmdb-badge-in-lib';
-                        badge.textContent = '✓ In Library';
+                    const badge = card.querySelector('.tmdb-badge-in-lib');
+                    if (!badge) {
+                        const newBadge = document.createElement('span');
+                        newBadge.className = 'tmdb-badge-in-lib';
+                        newBadge.textContent = '✓ In Library';
+                        card.querySelector('.tmdb-poster-container')?.prepend(newBadge);
                     }
                     showToast(`Added "${payload.title}" to your library!`, 'success');
                 }
             };
 
-            card.addEventListener('click', (e) => {
-                if (e.target.tagName === 'SELECT' || e.target.tagName === 'OPTION' || e.target.closest('.tmdb-service-row')) {
-                    return;
-                }
-                const btnEl = card.querySelector('.add-supabase-btn');
-                handleAddShow(btnEl);
-            });
+            const posterContainer = card.querySelector('.tmdb-poster-container');
+            if (posterContainer) {
+                posterContainer.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const svc = document.getElementById(`service-${item.id}`)?.value || initialService;
+                    openImdbModal({
+                        id: item.id,
+                        tmdb_id: item.id,
+                        title: showName,
+                        name: showName,
+                        poster: poster,
+                        poster_path: item.poster_path,
+                        year: year,
+                        first_air_date: item.first_air_date,
+                        overview: item.overview,
+                        rating: item.vote_average,
+                        service: svc
+                    });
+                });
+                posterContainer.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const svc = document.getElementById(`service-${item.id}`)?.value || initialService;
+                        openImdbModal({
+                            id: item.id,
+                            tmdb_id: item.id,
+                            title: showName,
+                            name: showName,
+                            poster: poster,
+                            poster_path: item.poster_path,
+                            year: year,
+                            first_air_date: item.first_air_date,
+                            overview: item.overview,
+                            rating: item.vote_average,
+                            service: svc
+                        });
+                    }
+                });
+            }
 
-            card.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    if (e.target.tagName === 'SELECT') return;
-                    e.preventDefault();
-                    const btnEl = card.querySelector('.add-supabase-btn');
-                    handleAddShow(btnEl);
-                }
-            });
+            const addBtn = card.querySelector('.add-supabase-btn');
+            if (addBtn) {
+                addBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    handleAddShow(addBtn);
+                });
+            }
 
             tmdbResultsGrid.appendChild(card);
         });
