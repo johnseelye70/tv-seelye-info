@@ -325,6 +325,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const customService = document.getElementById('custom-service');
     const customAddBtn = document.getElementById('custom-add-btn');
 
+    // Add Shows Modal Handlers
+    function openAddShowsModal() {
+        if (addShowsModal) {
+            addShowsModal.classList.remove('hidden');
+            if (tmdbSearchQuery) {
+                setTimeout(() => tmdbSearchQuery.focus(), 50);
+            }
+        }
+    }
+    window.openAddShowsModal = openAddShowsModal;
+
+    function closeAddShowsModal() {
+        if (addShowsModal) {
+            addShowsModal.classList.add('hidden');
+        }
+    }
+    window.closeAddShowsModal = closeAddShowsModal;
+
     // Admin Authentication Elements
     const adminAuthModal = document.getElementById('admin-auth-modal');
     const closeAdminAuthBtn = document.getElementById('close-admin-auth-btn');
@@ -710,11 +728,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h2 style="margin-bottom: 12px; font-size: 1.85rem;">Your Library is Empty!</h2>
                     <p style="color: var(--text-muted); margin-bottom: 25px; font-size: 1.05rem; max-width: 520px; margin-left: auto; margin-right: auto;">Explore popular hits across streaming platforms, search TMDB, or discover smart recommendations to start building your personal watchlist.</p>
                     <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
-                        <button class="btn primary-btn" style="font-size: 1rem; padding: 12px 24px;" onclick="document.getElementById('add-shows-btn').click()">+ Search & Add Shows</button>
+                        <button id="empty-lib-search-btn" class="btn primary-btn" style="font-size: 1rem; padding: 12px 24px;" onclick="openAddShowsModal()">+ Search & Add Shows</button>
                         <button class="btn secondary-btn" style="font-size: 1rem; padding: 12px 24px;" onclick="switchView('explore')">📺 Explore Streaming Services</button>
                     </div>
                 </div>
             `;
+            const emptyLibSearchBtn = document.getElementById('empty-lib-search-btn');
+            if (emptyLibSearchBtn) {
+                emptyLibSearchBtn.addEventListener('click', openAddShowsModal);
+            }
             return;
         }
 
@@ -2397,13 +2419,30 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- Admin / Modal Logic ---
         if (addShowsBtn) {
             addShowsBtn.addEventListener('click', () => {
-                addShowsModal.classList.remove('hidden');
+                openAddShowsModal();
+            });
+        }
+
+        const librarySearchAddBtn = document.getElementById('library-search-add-btn');
+        if (librarySearchAddBtn) {
+            librarySearchAddBtn.addEventListener('click', () => {
+                openAddShowsModal();
             });
         }
         
-        closeAddShowsBtn.addEventListener('click', () => {
-            addShowsModal.classList.add('hidden');
-        });
+        if (closeAddShowsBtn) {
+            closeAddShowsBtn.addEventListener('click', () => {
+                closeAddShowsModal();
+            });
+        }
+
+        if (addShowsModal) {
+            addShowsModal.addEventListener('click', (e) => {
+                if (e.target === addShowsModal) {
+                    closeAddShowsModal();
+                }
+            });
+        }
 
         settingsBtn.addEventListener('click', () => {
             requireAdminAuth(async () => {
@@ -2475,6 +2514,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (adminAuthModal && !adminAuthModal.classList.contains('hidden')) {
                     closeAdminAuthModal();
+                }
+                if (addShowsModal && !addShowsModal.classList.contains('hidden')) {
+                    closeAddShowsModal();
                 }
             }
         });
