@@ -4,9 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seelye TV Hub</title>
+    <!-- App Favicon & Device Icons -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=0.14.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=0.14.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=0.14.0">
+    <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=0.13.0">
+    <link rel="stylesheet" href="style.css?v=0.14.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -160,11 +165,12 @@
 
     <footer class="site-footer">
         <div class="version-info">
-            <strong>Version: Beta 0.13.0</strong>
+            <strong>Version: Beta 0.14.0</strong>
         </div>
         <div class="changelog">
             <h3>Version History</h3>
             <ul>
+                <li><strong>Beta 0.14.0</strong> - Browser Tab App Icon & Brand Identity: Added custom browser tab favicons tailored to the app's dark neon aesthetic. Includes an ultra-crisp vector SVG favicon (`favicon.svg`) featuring a glowing electric-cyan widescreen TV monitor with centered play beacon on obsidian slate, complemented by high-res PNG and Apple Touch icons (`apple-touch-icon.png`) and standard ICO fallback for Chrome, Edge, Firefox, and Safari tabs.</li>
                 <li><strong>Beta 0.13.0</strong> - Strict Category & Tone Recommendation Boundaries: Comprehensive taxonomy overhaul classifying every catalog and TMDB title into distinct primary categories (lighthearted comedy, prestige drama, dark supernatural mystery, mind-bending sci-fi, gritty crime, action-thriller) and explicit tones (lighthearted, wholesome, dark, gritty, tense, serious, satirical). Strict mood isolation eliminates overlap, ensuring dark gothic mysteries like <em>Wednesday</em>, caustic satires like <em>The Bear</em>, and intense thrillers like <em>Squid Game</em> are never cross-recommended in lighthearted comedy queues or confused with pure prestige dramas.</li>
                 <li><strong>Beta 0.12.0</strong> - 30-Second Entertainment Taste Quiz: Added a fast, interactive 4-question taste quiz rendered 100% inline in Smart Recommendations. Calibrates the recommendation queue in under 30 seconds across mood/vibe, story world, narrative pacing, and streaming service affinities with instant ranking boosts, custom rationale badges, and one-click retake/reset controls.</li>
                 <li><strong>Beta 0.11.0</strong> - IMDb Show Details Pop-up Modal: Decoupled show addition from card clicking so shows are only added via the explicit "+ Add to Library" button. Clicking any show's picture opens a dedicated IMDb pop-up modal over the screen with full plot synopses, cast, seasons, ratings, direct IMDb link, and an interactive "x" close button.</li>
@@ -294,8 +300,8 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=0.13.0"></script>
-    <script src="db.js?v=0.13.0"></script>
-    <script src="app.js?v=0.13.0"></script>
+    <script src="service_catalog.js?v=0.14.0"></script>
+    <script src="db.js?v=0.14.0"></script>
+    <script src="app.js?v=0.14.0"></script>
 </body>
 </html>
