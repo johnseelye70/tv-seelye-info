@@ -663,6 +663,33 @@ a { color: var(--accent-color); text-decoration: none; }
     padding-right: 4px;
 }
 
+/* --- Service Discovery Section --- */
+.service-discovery-section {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.service-discovery-header {
+    margin-bottom: 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.service-discovery-header h2 {
+    font-size: 1.45rem;
+    color: var(--text-main);
+    margin-bottom: 0.25rem;
+}
+
+.service-discovery-header p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+
 /* --- Card Removal Action --- */
 .remove-btn {
     background: transparent;
