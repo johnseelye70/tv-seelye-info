@@ -6,7 +6,7 @@
     <title>Seelye TV Hub</title>
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=0.9.0">
+    <link rel="stylesheet" href="style.css?v=0.10.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -78,6 +78,7 @@
                     <button class="pill-btn" data-service="hulu">Hulu <span class="svc-count" id="svc-count-hulu"></span></button>
                     <button class="pill-btn" data-service="prime">Prime Video <span class="svc-count" id="svc-count-prime"></span></button>
                     <button class="pill-btn" data-service="youtube">YouTube TV <span class="svc-count" id="svc-count-youtube"></span></button>
+                    <button class="pill-btn" data-service="appletv">Apple TV+ <span class="svc-count" id="svc-count-appletv"></span></button>
                 </div>
 
                 <!-- Personal Search Bar -->
@@ -133,6 +134,7 @@
                     <button class="pill-btn" data-service="peacock">Peacock</button>
                     <button class="pill-btn" data-service="prime">Prime Video</button>
                     <button class="pill-btn" data-service="youtube">YouTube TV</button>
+                    <button class="pill-btn" data-service="appletv">Apple TV+</button>
                 </div>
 
                 <!-- Service Discovery Header & Grid -->
@@ -153,11 +155,12 @@
 
     <footer class="site-footer">
         <div class="version-info">
-            <strong>Version: Beta 0.9.0</strong>
+            <strong>Version: Beta 0.10.0</strong>
         </div>
         <div class="changelog">
             <h3>Version History</h3>
             <ul>
+                <li><strong>Beta 0.10.0</strong> - Apple TV+ Streaming Option: Integrated Apple TV+ across the application including personal library provider filters, explore streaming services discovery with acclaimed hits (Ted Lasso, Severance, Silo, Slow Horses, and more), taste profile analysis, and TMDB addition.</li>
                 <li><strong>Beta 0.9.0</strong> - Architecture & Smart Recommendations Overhaul: Separated personal My Library from Explore Streaming Services into dedicated inline views with real-time counters and status filters. Added multi-vector intelligent recommendation engine analyzing watch history, thumbs-up ratings, and genre profiles with contextual rationale badges.</li>
                 <li><strong>Beta 0.8.0</strong> - Streaming Service Discovery: Clicking any streaming service (Netflix, Disney+, Peacock, Hulu, Prime Video, YouTube TV) instantly displays currently popular and classic shows for that service with one-click library addition.</li>
                 <li><strong>Beta 0.7.0</strong> - Fixed TMDB search cut-off posters by eliminating inner scroll-traps and expanding result card grid (min 185px). Made entire show card clickable for instant library addition with responsive visual feedback, resolved Supabase UUID formatting and guest mode storage persistence, and enabled Enter key search with catalog-to-TMDB fallback.</li>
@@ -191,6 +194,7 @@
                         <button class="pill-btn quick-browse-btn" data-service="hulu" style="padding: 4px 10px; font-size: 0.78rem;">Hulu</button>
                         <button class="pill-btn quick-browse-btn" data-service="prime" style="padding: 4px 10px; font-size: 0.78rem;">Prime Video</button>
                         <button class="pill-btn quick-browse-btn" data-service="youtube" style="padding: 4px 10px; font-size: 0.78rem;">YouTube TV</button>
+                        <button class="pill-btn quick-browse-btn" data-service="appletv" style="padding: 4px 10px; font-size: 0.78rem;">Apple TV+</button>
                     </div>
                     <div id="tmdb-results-grid" class="tmdb-results"></div>
                 </div>
@@ -215,6 +219,7 @@
                             <option value="disney">Disney+</option>
                             <option value="peacock">Peacock</option>
                             <option value="prime">Prime Video</option>
+                            <option value="appletv">Apple TV+</option>
                         </select>
                     </div>
                     <button id="custom-add-btn" class="btn secondary-btn" style="width: 100%;">Add to Library</button>
@@ -271,8 +276,8 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=0.9.0"></script>
-    <script src="db.js?v=0.9.0"></script>
-    <script src="app.js?v=0.9.0"></script>
+    <script src="service_catalog.js?v=0.10.0"></script>
+    <script src="db.js?v=0.10.0"></script>
+    <script src="app.js?v=0.10.0"></script>
 </body>
 </html>

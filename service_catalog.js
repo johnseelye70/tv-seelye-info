@@ -375,5 +375,77 @@ window.SERVICE_CATALOG = {
       "poster": "https://image.tmdb.org/t/p/w500/hfz0IgebqGENG6ZnuqKQKMFk2vy.jpg",
       "overview": "America's favorite quiz show where contestants are presented with general knowledge clues in the for..."
     }
+  ],
+  "appletv": [
+    {
+      "id": "97546",
+      "title": "Ted Lasso",
+      "year": "2020",
+      "poster": "https://image.tmdb.org/t/p/w500/uRHsiw1wLxPHFXkkv4Ix1s0O6f4.jpg",
+      "overview": "Ted Lasso, an American football coach, moves to England when he's hired to manage a soccer team..."
+    },
+    {
+      "id": "95396",
+      "title": "Severance",
+      "year": "2022",
+      "poster": "https://image.tmdb.org/t/p/w500/pPHpeI2X1qEd1CS1SeyrdhZ4qnT.jpg",
+      "overview": "Mark leads a team of office workers whose memories have been surgically divided between their work and personal lives..."
+    },
+    {
+      "id": "125988",
+      "title": "Silo",
+      "year": "2023",
+      "poster": "https://image.tmdb.org/t/p/w500/gMYZZvnkVNTqSVnVCphWbPXwWwb.jpg",
+      "overview": "In a ruined and toxic future, thousands live in a giant silo deep underground. After its sheriff breaks a cardinal rule..."
+    },
+    {
+      "id": "95480",
+      "title": "Slow Horses",
+      "year": "2022",
+      "poster": "https://image.tmdb.org/t/p/w500/AdYr4DjOgXvDUMwu6vEhZy1Rnxk.jpg",
+      "overview": "Follow a dysfunctional team of MI5 agents—and their obnoxious boss, Jackson Lamb—as they defend England from sinister forces..."
+    },
+    {
+      "id": "90282",
+      "title": "The Morning Show",
+      "year": "2019",
+      "poster": "https://image.tmdb.org/t/p/w500/y9x2R87yt2U616736NJrP0d56dt.jpg",
+      "overview": "A candid look at modern workplace dynamics through the lens of the people who help America wake up each morning..."
+    },
+    {
+      "id": "87917",
+      "title": "For All Mankind",
+      "year": "2019",
+      "poster": "https://image.tmdb.org/t/p/w500/JP3DItWMbrrLiKR5AYUfpsNf2b.jpg",
+      "overview": "Explore an aspirational world where NASA and the global space race remained a high priority and never ended..."
+    },
+    {
+      "id": "93740",
+      "title": "Foundation",
+      "year": "2021",
+      "poster": "https://image.tmdb.org/t/p/w500/tg9I5pOY4M9CKj8U0cxVBTsm5eh.jpg",
+      "overview": "Follow a band of exiles on their monumental journey to save humanity and rebuild civilization amid the fall of the Galactic Empire..."
+    },
+    {
+      "id": "136311",
+      "title": "Shrinking",
+      "year": "2023",
+      "poster": "https://image.tmdb.org/t/p/w500/zEFKMNPBKq6JG7uuDkzTQ9WwErn.jpg",
+      "overview": "A grieving therapist starts to tell his clients exactly what he thinks, resulting in huge tumultuous changes in everyone's lives..."
+    },
+    {
+      "id": "155537",
+      "title": "Black Bird",
+      "year": "2022",
+      "poster": "https://image.tmdb.org/t/p/w500/qu312pwM61NPTr7nexvovCClDNP.jpg",
+      "overview": "As Jimmy Keene begins a 10-year prison sentence, he is offered freedom if he can elicit a confession from a suspected killer..."
+    },
+    {
+      "id": "87784",
+      "title": "Defending Jacob",
+      "year": "2020",
+      "poster": "https://image.tmdb.org/t/p/w500/JTmkzwSDRiS9nvSPwpDB9fmZj2.jpg",
+      "overview": "A family's lives are shattered when an assistant district attorney's 14-year-old son is charged with the murder of a classmate..."
+    }
   ]
 };

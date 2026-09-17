@@ -78,7 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
         hulu: { name: 'Hulu', networkId: '453' },
         peacock: { name: 'Peacock', networkId: '3353' },
         prime: { name: 'Prime Video', networkId: '1024' },
-        youtube: { name: 'YouTube TV', networkId: '247' }
+        youtube: { name: 'YouTube TV', networkId: '247' },
+        appletv: { name: 'Apple TV+', networkId: '2552' }
     };
 
     // Curated Metadata & Genre Mapping for Smart Recommendation Analysis
@@ -135,7 +136,17 @@ document.addEventListener('DOMContentLoaded', () => {
         "65701": { genres: ["Comedy", "Talk"], rating: 8.0, tags: ["rhett and link", "games", "internet"] },
         "1667": { genres: ["Comedy"], rating: 7.0, tags: ["sketch", "live", "comedy"] },
         "60625": { genres: ["Animation", "Sci-Fi & Fantasy", "Comedy"], rating: 8.7, tags: ["multiverse", "scientist", "portal"] },
-        "2912": { genres: ["News", "Family"], rating: 7.5, tags: ["trivia", "quiz", "game show"] }
+        "2912": { genres: ["News", "Family"], rating: 7.5, tags: ["trivia", "quiz", "game show"] },
+        "97546": { genres: ["Comedy", "Drama"], rating: 8.4, tags: ["soccer", "feel good", "wholesome", "coach"] },
+        "95396": { genres: ["Sci-Fi & Fantasy", "Drama", "Mystery"], rating: 8.4, tags: ["workplace", "dystopia", "thriller", "corporate"] },
+        "125988": { genres: ["Sci-Fi & Fantasy", "Drama"], rating: 8.2, tags: ["underground", "dystopia", "post-apocalypse", "survival"] },
+        "95480": { genres: ["Drama", "Crime", "Thriller"], rating: 8.0, tags: ["spy", "mi5", "london", "slough house"] },
+        "90282": { genres: ["Drama"], rating: 7.7, tags: ["broadcast", "news", "journalism", "metoo"] },
+        "87917": { genres: ["Sci-Fi & Fantasy", "Drama"], rating: 7.7, tags: ["space", "nasa", "alternate history", "cold war"] },
+        "93740": { genres: ["Sci-Fi & Fantasy", "Drama"], rating: 7.7, tags: ["space", "asimov", "galactic empire", "math"] },
+        "136311": { genres: ["Comedy", "Drama"], rating: 7.8, tags: ["therapy", "grief", "friendship", "psychology"] },
+        "155537": { genres: ["Drama", "Crime"], rating: 8.1, tags: ["prison", "fbi", "true crime", "serial killer"] },
+        "87784": { genres: ["Drama", "Mystery", "Crime"], rating: 8.2, tags: ["lawyer", "murder", "trial", "family"] }
     };
 
     // Admin Elements
@@ -332,6 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (norm === 'disney') return rawName.includes('disney');
         if (norm === 'prime') return rawName.includes('prime') || rawName.includes('amazon');
         if (norm === 'youtube') return rawName.includes('youtube');
+        if (norm === 'appletv' || norm === 'apple') return rawName.includes('apple');
         return rawName.includes(norm);
     }
 
@@ -469,7 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cntComp) cntComp.textContent = completed;
 
         // Provider counts
-        ['netflix', 'disney', 'peacock', 'hulu', 'prime', 'youtube'].forEach(svc => {
+        ['netflix', 'disney', 'peacock', 'hulu', 'prime', 'youtube', 'appletv'].forEach(svc => {
             const el = document.getElementById(`svc-count-${svc}`);
             if (el) {
                 const count = allContent.filter(item => matchesServiceFilter(item, svc)).length;
@@ -799,8 +811,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Detect service
             const rawSvc = (item.streaming_services?.name || item.mock_service || '').toLowerCase();
-            for (const key of ['netflix', 'disney', 'hulu', 'peacock', 'prime', 'youtube']) {
-                if (rawSvc.includes(key)) {
+            for (const key of ['netflix', 'disney', 'hulu', 'peacock', 'prime', 'youtube', 'appletv']) {
+                if (rawSvc.includes(key) || (key === 'appletv' && rawSvc.includes('apple'))) {
                     serviceCounts[key] = (serviceCounts[key] || 0) + 1;
                     break;
                 }
@@ -1546,6 +1558,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <option value="peacock" ${initialService === 'peacock' ? 'selected' : ''}>Peacock</option>
                             <option value="hulu" ${initialService === 'hulu' ? 'selected' : ''}>Hulu</option>
                             <option value="prime" ${initialService === 'prime' ? 'selected' : ''}>Prime Video</option>
+                            <option value="appletv" ${initialService === 'appletv' ? 'selected' : ''}>Apple TV+</option>
                         </select>
                     </div>
 
@@ -1572,7 +1585,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const serviceSelect = document.getElementById(`service-${item.id}`);
                 const serviceId = serviceSelect?.value || initialService || '';
-                const isCustomName = ['youtube', 'netflix', 'disney', 'peacock', 'hulu', 'prime'].includes(serviceId);
+                const isCustomName = ['youtube', 'netflix', 'disney', 'peacock', 'hulu', 'prime', 'appletv'].includes(serviceId);
 
                 const payload = {
                     id: uuid,
