@@ -6,7 +6,7 @@
     <title>Seelye TV Hub</title>
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=0.8.0">
+    <link rel="stylesheet" href="style.css?v=0.9.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -24,70 +24,141 @@
     </header>
 
     <main class="dashboard">
-        <!-- Continue Watching Section -->
-        <section class="horizontal-scroll-section" id="continue-watching-container" style="display: none; margin-bottom: 30px;">
-            <h2 style="margin-bottom: 15px;">Continue Watching</h2>
-            <div class="horizontal-scroll-grid" id="continue-watching-grid" style="display: flex; overflow-x: auto; gap: 20px; padding-bottom: 10px;">
-                <!-- JS Injects -->
-            </div>
-        </section>
+        <!-- Primary Inline Navigation Bar -->
+        <nav class="dashboard-nav" id="main-nav" aria-label="Main Navigation">
+            <button class="nav-tab active" id="tab-library" data-view="library">
+                <span class="nav-tab-icon">🎬</span>
+                <span class="nav-tab-label">My Library</span>
+                <span class="nav-tab-badge" id="library-count-badge">0</span>
+            </button>
+            <button class="nav-tab" id="tab-recommendations" data-view="recommendations">
+                <span class="nav-tab-icon">✨</span>
+                <span class="nav-tab-label">Smart Recommendations</span>
+                <span class="nav-tab-badge pulse-badge" id="rec-count-badge" style="display: none;">Top Picks</span>
+            </button>
+            <button class="nav-tab" id="tab-explore" data-view="explore">
+                <span class="nav-tab-icon">📺</span>
+                <span class="nav-tab-label">Explore Streaming Services</span>
+            </button>
+        </nav>
 
-        <!-- Recommended For You Section -->
-        <section class="horizontal-scroll-section" id="recommendations-container" style="display: none; margin-bottom: 40px;">
-            <h2 style="margin-bottom: 15px;">Recommended for You</h2>
-            <div class="horizontal-scroll-grid" id="recommendations-grid" style="display: flex; overflow-x: auto; gap: 20px; padding-bottom: 10px;">
-                <!-- JS Injects -->
-            </div>
-        </section>
-
-        <!-- My Library / Filters -->
-        <section class="filters-section">
-            <h2>My Library</h2>
-            <div class="filter-bar" id="service-filters" style="margin-top: 15px;">
-                <button class="pill-btn active" data-service="all">All</button>
-                <button class="pill-btn" data-service="netflix">Netflix</button>
-                <button class="pill-btn" data-service="disney">Disney+</button>
-                <button class="pill-btn" data-service="peacock">Peacock</button>
-                <button class="pill-btn" data-service="hulu">Hulu</button>
-                <button class="pill-btn" data-service="prime">Prime Video</button>
-                <button class="pill-btn" data-service="youtube">YouTube TV</button>
-            </div>
-            <div class="search-bar" style="margin-top: 15px;">
-                <!-- Decoy inputs for aggressive password managers -->
-                <input type="text" style="display:none;" aria-hidden="true">
-                <input type="password" style="display:none;" aria-hidden="true">
-                <input type="search" id="library-filter-field" placeholder="Search library..." autocomplete="new-password" data-lpignore="true" spellcheck="false" autocorrect="off" readonly onfocus="this.removeAttribute('readonly');">
-            </div>
-        </section>
-
-        <!-- Main Catalog Grid -->
-        <section class="catalog-section">
-            <div class="catalog-grid" id="catalog-grid">
-                <!-- Content cards will be injected here via app.js -->
-            </div>
-        </section>
-
-        <!-- Service Discovery (Popular & Classic) Section -->
-        <section class="service-discovery-section" id="service-discovery-container" style="display: none;">
-            <div class="service-discovery-header">
-                <div>
-                    <h2 id="service-discovery-title">Popular & Classic on Service</h2>
-                    <p id="service-discovery-subtitle">Explore iconic hits and classics available on this service. Click any show to quickly add it to your library.</p>
+        <!-- VIEW 1: My Personal Library (Active by Default) -->
+        <div class="view-panel active" id="view-library">
+            <!-- Continue Watching Section -->
+            <section class="horizontal-scroll-section" id="continue-watching-container" style="display: none; margin-bottom: 30px;">
+                <h2 style="margin-bottom: 15px;">Continue Watching</h2>
+                <div class="horizontal-scroll-grid" id="continue-watching-grid" style="display: flex; overflow-x: auto; gap: 20px; padding-bottom: 10px;">
+                    <!-- JS Injects -->
                 </div>
-            </div>
-            <div class="tmdb-results" id="service-discovery-grid">
-                <!-- Injected dynamically via app.js -->
-            </div>
-        </section>
+            </section>
+
+            <!-- Library Filters & Controls -->
+            <section class="filters-section">
+                <div class="library-header-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 1.5rem;">My Library <span id="library-header-count" style="font-size: 1rem; color: var(--text-muted); font-weight: normal;">(0 shows)</span></h2>
+                        <p style="color: var(--text-muted); font-size: 0.88rem; margin: 4px 0 0 0;">Your personal collection, watch progress, and ratings.</p>
+                    </div>
+                </div>
+
+                <!-- Status Filter Pills -->
+                <div class="filter-bar status-filter-bar" id="library-status-filters" style="margin-bottom: 12px;">
+                    <button class="pill-btn active" data-status="all">All Shows <span class="status-count" id="count-status-all">0</span></button>
+                    <button class="pill-btn" data-status="watching">Watching <span class="status-count" id="count-status-watching">0</span></button>
+                    <button class="pill-btn" data-status="want_to_watch">Want to Watch <span class="status-count" id="count-status-want">0</span></button>
+                    <button class="pill-btn" data-status="completed">Completed <span class="status-count" id="count-status-completed">0</span></button>
+                </div>
+
+                <!-- Provider Filter Pills within Library -->
+                <div class="filter-bar provider-filter-bar" id="library-service-filters" style="margin-bottom: 15px;">
+                    <button class="pill-btn active" data-service="all">All Providers</button>
+                    <button class="pill-btn" data-service="netflix">Netflix <span class="svc-count" id="svc-count-netflix"></span></button>
+                    <button class="pill-btn" data-service="disney">Disney+ <span class="svc-count" id="svc-count-disney"></span></button>
+                    <button class="pill-btn" data-service="peacock">Peacock <span class="svc-count" id="svc-count-peacock"></span></button>
+                    <button class="pill-btn" data-service="hulu">Hulu <span class="svc-count" id="svc-count-hulu"></span></button>
+                    <button class="pill-btn" data-service="prime">Prime Video <span class="svc-count" id="svc-count-prime"></span></button>
+                    <button class="pill-btn" data-service="youtube">YouTube TV <span class="svc-count" id="svc-count-youtube"></span></button>
+                </div>
+
+                <!-- Personal Search Bar -->
+                <div class="search-bar">
+                    <!-- Decoy inputs for aggressive password managers -->
+                    <input type="text" style="display:none;" aria-hidden="true">
+                    <input type="password" style="display:none;" aria-hidden="true">
+                    <input type="search" id="library-filter-field" placeholder="Search your library by title..." autocomplete="new-password" data-lpignore="true" spellcheck="false" autocorrect="off" readonly onfocus="this.removeAttribute('readonly');">
+                </div>
+            </section>
+
+            <!-- Main Library Content Grid -->
+            <section class="catalog-section">
+                <div class="catalog-grid" id="catalog-grid">
+                    <!-- Content cards will be injected here via app.js -->
+                </div>
+            </section>
+        </div>
+
+        <!-- VIEW 2: Smart Recommendations (100% Inline) -->
+        <div class="view-panel" id="view-recommendations" style="display: none;">
+            <section class="recommendations-view-section">
+                <div class="view-header" style="margin-bottom: 20px;">
+                    <h2 style="font-size: 1.6rem; margin-bottom: 4px;">Smart Recommendations</h2>
+                    <p style="color: var(--text-muted); font-size: 0.95rem;">Intelligent picks synthesized from your watch history, thumbs-up ratings, and favorite genres.</p>
+                </div>
+
+                <!-- Taste Profile Summary Banner -->
+                <div class="taste-profile-banner" id="taste-profile-banner">
+                    <!-- Dynamically populated via app.js -->
+                </div>
+
+                <!-- Recommendations Container -->
+                <div id="smart-recs-content">
+                    <!-- Dynamically populated via app.js -->
+                </div>
+            </section>
+        </div>
+
+        <!-- VIEW 3: Explore Streaming Services (100% Inline) -->
+        <div class="view-panel" id="view-explore" style="display: none;">
+            <section class="explore-view-section">
+                <div class="view-header" style="margin-bottom: 20px;">
+                    <h2 style="font-size: 1.6rem; margin-bottom: 4px;">Explore Streaming Services</h2>
+                    <p style="color: var(--text-muted); font-size: 0.95rem;">Browse popular and classic titles by provider. Add any title directly to your library with one click.</p>
+                </div>
+
+                <!-- Provider Selector -->
+                <div class="filter-bar" id="explore-service-filters" style="margin-bottom: 25px;">
+                    <button class="pill-btn active" data-service="netflix">Netflix</button>
+                    <button class="pill-btn" data-service="disney">Disney+</button>
+                    <button class="pill-btn" data-service="hulu">Hulu</button>
+                    <button class="pill-btn" data-service="peacock">Peacock</button>
+                    <button class="pill-btn" data-service="prime">Prime Video</button>
+                    <button class="pill-btn" data-service="youtube">YouTube TV</button>
+                </div>
+
+                <!-- Service Discovery Header & Grid -->
+                <div class="service-discovery-section" id="service-discovery-container">
+                    <div class="service-discovery-header">
+                        <div>
+                            <h3 id="service-discovery-title" style="font-size: 1.35rem; color: var(--text-main); margin-bottom: 4px;">Popular & Classic on Netflix</h3>
+                            <p id="service-discovery-subtitle" style="color: var(--text-muted); font-size: 0.92rem;">Iconic hits and acclaimed classics available on Netflix. Click any show or "+ Add" to add it to your library.</p>
+                        </div>
+                    </div>
+                    <div class="tmdb-results" id="service-discovery-grid">
+                        <!-- Injected dynamically via app.js -->
+                    </div>
+                </div>
+            </section>
+        </div>
     </main>
 
     <footer class="site-footer">
         <div class="version-info">
-            <strong>Version: Beta 0.8.0</strong>
+            <strong>Version: Beta 0.9.0</strong>
         </div>
         <div class="changelog">
             <h3>Version History</h3>
             <ul>
+                <li><strong>Beta 0.9.0</strong> - Architecture & Smart Recommendations Overhaul: Separated personal My Library from Explore Streaming Services into dedicated inline views with real-time counters and status filters. Added multi-vector intelligent recommendation engine analyzing watch history, thumbs-up ratings, and genre profiles with contextual rationale badges.</li>
                 <li><strong>Beta 0.8.0</strong> - Streaming Service Discovery: Clicking any streaming service (Netflix, Disney+, Peacock, Hulu, Prime Video, YouTube TV) instantly displays currently popular and classic shows for that service with one-click library addition.</li>
                 <li><strong>Beta 0.7.0</strong> - Fixed TMDB search cut-off posters by eliminating inner scroll-traps and expanding result card grid (min 185px). Made entire show card clickable for instant library addition with responsive visual feedback, resolved Supabase UUID formatting and guest mode storage persistence, and enabled Enter key search with catalog-to-TMDB fallback.</li>
                 <li><strong>Beta 0.6.0</strong> - Comprehensive Audit & Overhaul: Fixed live catalog render on show addition, normalized streaming service filters, added show deletion/removal, resilient offline/guest storage sync, and repaired modal layout structures.</li>
@@ -200,8 +271,8 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=0.8.0"></script>
-    <script src="db.js?v=0.8.0"></script>
-    <script src="app.js?v=0.8.0"></script>
+    <script src="service_catalog.js?v=0.9.0"></script>
+    <script src="db.js?v=0.9.0"></script>
+    <script src="app.js?v=0.9.0"></script>
 </body>
 </html>
