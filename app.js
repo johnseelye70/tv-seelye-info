@@ -225,7 +225,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (filteredContent.length === 0) {
             let reason = searchQuery ? ` matching "${searchQuery}"` : '';
-            catalogGrid.innerHTML = `<p class="skeleton-loader" style="grid-column: 1 / -1; text-align: center;">No library content found${reason}.</p>`;
+            catalogGrid.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px;">
+                    <p class="skeleton-loader" style="margin-bottom: 15px;">No library content found${reason}.</p>
+                    ${searchQuery ? `<button id="search-tmdb-fallback-btn" class="btn primary-btn" style="padding: 10px 20px; font-size: 0.95rem;">Search TMDB for "${searchQuery.replace(/"/g, '&quot;')}"</button>` : ''}
+                </div>
+            `;
+            const fallbackBtn = document.getElementById('search-tmdb-fallback-btn');
+            if (fallbackBtn) {
+                fallbackBtn.addEventListener('click', () => {
+                    addShowsModal.classList.remove('hidden');
+                    tmdbSearchQuery.value = searchQuery;
+                    tmdbSearchBtn.click();
+                });
+            }
             return;
         }
 
@@ -270,12 +283,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Recommend based on both currently watching shows and completed/liked shows
-        const targetIds = userWatchlist
+        const targetWatchlistIds = userWatchlist
             .filter(w => (w.status === 'completed' && w.rating === 'thumbs_up') || w.status === 'watching')
-            .map(w => w.content_item_id);
+            .map(w => String(w.content_item_id));
             
-        // Filter strictly to numeric TMDB IDs to avoid 404s on custom shows
-        const numericIds = targetIds.filter(id => /^\d+$/.test(String(id)));
+        const targetShows = allContent.filter(c => targetWatchlistIds.includes(String(c.id)) || (c.tmdb_id && targetWatchlistIds.includes(String(c.tmdb_id))));
+        const numericIds = targetShows
+            .map(c => c.tmdb_id || c.id)
+            .filter(id => /^\d+$/.test(String(id)));
         if (numericIds.length === 0) {
             recommendations = [];
             return;
@@ -565,6 +580,14 @@ document.addEventListener('DOMContentLoaded', () => {
             tmdbSearchBtn.disabled = false;
         });
 
+        // Trigger search on Enter key press
+        tmdbSearchQuery.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                tmdbSearchBtn.click();
+            }
+        });
+
         // Custom Manual Add
         customAddBtn.addEventListener('click', async () => {
             const title = customTitle.value.trim();
@@ -582,24 +605,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 type: 'series_season',
                 release_year: new Date().getFullYear(),
                 poster_url: poster,
-                service_id: null,
+                streaming_service_id: null,
                 mock_service: service
             };
 
             customAddBtn.textContent = 'Adding...';
             customAddBtn.disabled = true;
-            const { error } = await window.db.insertContentItem(payload);
+            const { data, error } = await window.db.insertContentItem(payload);
             
             if (error) {
                 showToast("Error adding show: " + error.message, 'error');
                 customAddBtn.textContent = 'Add to Library';
                 customAddBtn.disabled = false;
             } else {
-                // Instantly update local in-memory catalog
-                if (!allContent.some(c => String(c.id) === String(payload.id))) {
-                    allContent.push(payload);
+                const savedItem = (data && data[0]) ? data[0] : payload;
+                if (!allContent.some(c => String(c.id) === String(savedItem.id))) {
+                    allContent.push(savedItem);
                 }
-                await updateWatchState(payload.id, 'want_to_watch', null);
+                await updateWatchState(savedItem.id, 'want_to_watch', null);
                 renderAllSections();
 
                 customTitle.value = '';
@@ -620,86 +643,139 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTmdbResults(results) {
         tmdbResultsGrid.innerHTML = '';
         if (results.length === 0) {
-            tmdbResultsGrid.innerHTML = '<p style="color: var(--text-muted); grid-column: 1 / -1;">No matching shows found.</p>';
+            tmdbResultsGrid.innerHTML = '<p style="color: var(--text-muted); grid-column: 1 / -1; padding: 20px 0; text-align: center;">No matching shows found on TMDB.</p>';
             return;
         }
 
         const serviceOptions = allServices.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        const fallbackPoster = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='450' viewBox='0 0 300 450'%3E%3Crect width='300' height='450' fill='%231e1e1e'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23666' font-family='sans-serif' font-size='16'%3ENo Poster%3C/text%3E%3C/svg%3E";
 
-        results.slice(0, 12).forEach(item => {
-            const poster = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://via.placeholder.com/300x450/111111/fff?text=No+Image';
+        results.slice(0, 16).forEach(item => {
+            const poster = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : fallbackPoster;
             const year = item.first_air_date ? item.first_air_date.split('-')[0] : 'TBA';
             const cleanTitle = (item.name || 'Untitled').replace(/"/g, '&quot;');
+            const overview = item.overview ? item.overview.slice(0, 95) + (item.overview.length > 95 ? '...' : '') : '';
             
-            const card = document.createElement('div');
-            card.className = 'tmdb-result-card';
-            card.innerHTML = `
-                <img src="${poster}" class="tmdb-poster" alt="${cleanTitle}" loading="lazy">
-                <div class="tmdb-info">
-                    <div class="tmdb-title">${item.name || 'Untitled'}</div>
-                    <div class="tmdb-year">${year}</div>
-                    
-                    <label style="font-size: 0.8rem; margin-top: 5px;">Service</label>
-                    <select class="admin-select-dropdown" id="service-${item.id}">
-                        <option value="">None / Unknown</option>
-                        ${serviceOptions}
-                        <option value="youtube">YouTube TV</option>
-                        <option value="netflix">Netflix</option>
-                        <option value="disney">Disney+</option>
-                        <option value="peacock">Peacock</option>
-                        <option value="hulu">Hulu</option>
-                        <option value="prime">Prime Video</option>
-                    </select>
+            const tmdbId = String(item.id);
+            const uuid = window.db?.toDeterministicUuid ? window.db.toDeterministicUuid(tmdbId) : tmdbId;
+            const isAlreadyInLib = allContent.some(c => String(c.id) === uuid || String(c.tmdb_id) === tmdbId || String(c.id) === tmdbId || (c.title && c.title.toLowerCase() === (item.name || '').toLowerCase()));
 
-                    <button class="btn primary-btn add-supabase-btn" style="margin-top: 8px; width: 100%; font-size: 0.85rem;" data-tmdb-id="${item.id}" data-title="${cleanTitle}" data-year="${year}" data-poster="${poster}">+ Add to Library</button>
+            const card = document.createElement('div');
+            card.className = `tmdb-result-card ${isAlreadyInLib ? 'already-in-library' : ''}`;
+            card.setAttribute('role', 'button');
+            card.setAttribute('tabindex', '0');
+            card.setAttribute('title', `Click to add "${cleanTitle}" to your library`);
+
+            card.innerHTML = `
+                <div class="tmdb-poster-container">
+                    <img src="${poster}" class="tmdb-poster" alt="${cleanTitle}" loading="lazy" onerror="this.onerror=null;this.src='${fallbackPoster}';">
+                    ${isAlreadyInLib ? '<span class="tmdb-badge-in-lib">✓ In Library</span>' : '<span class="tmdb-badge-add">+ Click to Add</span>'}
+                </div>
+                <div class="tmdb-info">
+                    <div class="tmdb-title" title="${cleanTitle}">${item.name || 'Untitled'}</div>
+                    <div class="tmdb-year">${year}</div>
+                    ${overview ? `<div class="tmdb-overview">${overview}</div>` : ''}
+                    
+                    <div class="tmdb-service-row" onclick="event.stopPropagation();">
+                        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 2px;">Service</label>
+                        <select class="admin-select-dropdown" id="service-${item.id}">
+                            <option value="">None / Unknown</option>
+                            ${serviceOptions}
+                            <option value="youtube">YouTube TV</option>
+                            <option value="netflix">Netflix</option>
+                            <option value="disney">Disney+</option>
+                            <option value="peacock">Peacock</option>
+                            <option value="hulu">Hulu</option>
+                            <option value="prime">Prime Video</option>
+                        </select>
+                    </div>
+
+                    <button class="btn primary-btn add-supabase-btn" style="margin-top: auto; width: 100%; font-size: 0.85rem;" data-tmdb-id="${item.id}" data-title="${cleanTitle}" data-year="${year}" data-poster="${poster}">
+                        ${isAlreadyInLib ? '✓ In Library' : '+ Add to Library'}
+                    </button>
                 </div>
             `;
-            tmdbResultsGrid.appendChild(card);
-        });
 
-        document.querySelectorAll('.add-supabase-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                const btnEl = e.target;
-                const tmdbId = btnEl.dataset.tmdbId;
-                const title = btnEl.dataset.title;
-                const year = btnEl.dataset.year;
-                const poster = btnEl.dataset.poster;
+            const handleAddShow = async (btnEl) => {
+                if (card.classList.contains('adding')) return;
 
-                const serviceSelect = document.getElementById(`service-${tmdbId}`);
+                const currentInLib = allContent.some(c => String(c.id) === uuid || String(c.tmdb_id) === tmdbId || String(c.id) === tmdbId);
+                if (currentInLib) {
+                    showToast(`"${item.name}" is already in your library!`, 'info');
+                    return;
+                }
+
+                card.classList.add('adding');
+                if (btnEl) {
+                    btnEl.textContent = 'Adding...';
+                    btnEl.disabled = true;
+                }
+
+                const serviceSelect = document.getElementById(`service-${item.id}`);
                 const serviceId = serviceSelect?.value || '';
                 const isCustomName = ['youtube', 'netflix', 'disney', 'peacock', 'hulu', 'prime'].includes(serviceId);
 
-                btnEl.textContent = 'Adding...';
-                btnEl.disabled = true;
-
                 const payload = {
-                    id: String(tmdbId),
-                    title: title,
+                    id: uuid,
+                    tmdb_id: tmdbId,
+                    title: item.name || 'Untitled',
                     type: 'series_season',
                     release_year: parseInt(year) || null,
                     poster_url: poster,
-                    service_id: isCustomName ? null : (serviceId || null),
+                    streaming_service_id: isCustomName ? null : (serviceId || null),
                     mock_service: isCustomName ? serviceId : null
                 };
 
-                const { error } = await window.db.insertContentItem(payload);
+                const { data, error } = await window.db.insertContentItem(payload);
                 if (error) {
                     showToast("Error adding show: " + error.message, 'error');
-                    btnEl.textContent = 'Failed';
-                    btnEl.disabled = false;
-                } else {
-                    // Instantly update local in-memory catalog
-                    if (!allContent.some(c => String(c.id) === String(payload.id))) {
-                        allContent.push(payload);
+                    if (btnEl) {
+                        btnEl.textContent = 'Failed';
+                        btnEl.disabled = false;
                     }
-                    await updateWatchState(payload.id, 'want_to_watch', null);
+                    card.classList.remove('adding');
+                } else {
+                    const savedItem = (data && data[0]) ? data[0] : payload;
+                    if (!allContent.some(c => String(c.id) === String(savedItem.id))) {
+                        allContent.push(savedItem);
+                    }
+                    await updateWatchState(savedItem.id, 'want_to_watch', null);
                     renderAllSections();
 
-                    btnEl.textContent = '✓ Added!';
-                    btnEl.style.background = 'var(--success-color)';
-                    showToast(`Added "${title}" to your library!`, 'success');
+                    card.classList.remove('adding');
+                    card.classList.add('already-in-library');
+                    if (btnEl) {
+                        btnEl.textContent = '✓ Added!';
+                        btnEl.style.background = 'var(--success-color)';
+                        btnEl.disabled = true;
+                    }
+                    const badge = card.querySelector('.tmdb-badge-add');
+                    if (badge) {
+                        badge.className = 'tmdb-badge-in-lib';
+                        badge.textContent = '✓ In Library';
+                    }
+                    showToast(`Added "${payload.title}" to your library!`, 'success');
+                }
+            };
+
+            card.addEventListener('click', (e) => {
+                if (e.target.tagName === 'SELECT' || e.target.tagName === 'OPTION' || e.target.closest('.tmdb-service-row')) {
+                    return;
+                }
+                const btnEl = card.querySelector('.add-supabase-btn');
+                handleAddShow(btnEl);
+            });
+
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    if (e.target.tagName === 'SELECT') return;
+                    e.preventDefault();
+                    const btnEl = card.querySelector('.add-supabase-btn');
+                    handleAddShow(btnEl);
                 }
             });
+
+            tmdbResultsGrid.appendChild(card);
         });
     }
 

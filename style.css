@@ -472,42 +472,122 @@ a { color: var(--accent-color); text-decoration: none; }
 
 .tmdb-result-card {
     background: var(--surface-dark);
-    border-radius: 8px;
+    border-radius: 10px;
     overflow: hidden;
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     border: 1px solid var(--border-subtle);
     display: flex;
     flex-direction: column;
+    cursor: pointer;
+    position: relative;
+    user-select: none;
 }
 
 .tmdb-result-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+    transform: translateY(-4px);
+    box-shadow: 0 10px 24px rgba(0, 195, 255, 0.2);
+    border-color: var(--accent-color);
+}
+
+.tmdb-result-card.already-in-library {
+    border-color: rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.tmdb-result-card.adding {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.tmdb-poster-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 2/3;
+    background-color: #1a1a1a;
+    overflow: hidden;
 }
 
 .tmdb-poster {
     width: 100%;
+    height: 100%;
     aspect-ratio: 2/3;
     object-fit: cover;
+    display: block;
+    transition: transform 0.3s ease;
+}
+
+.tmdb-result-card:hover .tmdb-poster {
+    transform: scale(1.03);
+}
+
+.tmdb-badge-add {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(0, 123, 255, 0.85);
+    color: white;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    backdrop-filter: blur(4px);
+    transition: background-color 0.2s;
+}
+
+.tmdb-result-card:hover .tmdb-badge-add {
+    background: var(--accent-color);
+}
+
+.tmdb-badge-in-lib {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(16, 185, 129, 0.9);
+    color: white;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
 }
 
 .tmdb-info {
-    padding: 1rem;
+    padding: 0.9rem;
     flex-grow: 1;
     display: flex;
     flex-direction: column;
+    gap: 0.35rem;
 }
 
 .tmdb-title {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
-    margin-bottom: 0.5rem;
+    line-height: 1.3;
+    margin-bottom: 2px;
+    color: var(--text-main);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .tmdb-year {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
-    margin-bottom: 1rem;
+}
+
+.tmdb-overview {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.tmdb-service-row {
+    margin-top: 4px;
 }
 
 .admin-select-dropdown {
@@ -523,12 +603,12 @@ a { color: var(--accent-color); text-decoration: none; }
 
 /* --- Admin / Add Shows Modal Content --- */
 .modal-content.admin-content {
-    max-width: 850px;
+    max-width: 960px;
     width: 95%;
-    max-height: 85vh;
+    max-height: 88vh;
     overflow-y: auto;
     position: relative;
-    padding: 2rem 2.5rem 2rem 2rem;
+    padding: 2rem;
     -webkit-overflow-scrolling: touch;
 }
 
@@ -555,6 +635,10 @@ a { color: var(--accent-color); text-decoration: none; }
     margin-top: 1rem;
 }
 
+#admin-search-card {
+    grid-column: 1 / -1;
+}
+
 .admin-card {
     background: var(--surface-dark);
     border: 1px solid var(--border-subtle);
@@ -573,13 +657,10 @@ a { color: var(--accent-color); text-decoration: none; }
 
 .tmdb-results {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 1rem;
-    max-height: 380px;
-    overflow-y: auto;
-    margin-top: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+    gap: 1.25rem;
+    margin-top: 1.25rem;
     padding-right: 4px;
-    -webkit-overflow-scrolling: touch;
 }
 
 /* --- Card Removal Action --- */

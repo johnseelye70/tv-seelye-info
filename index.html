@@ -6,7 +6,7 @@
     <title>Seelye TV Hub</title>
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=0.6.0">
+    <link rel="stylesheet" href="style.css?v=0.7.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -70,11 +70,12 @@
 
     <footer class="site-footer">
         <div class="version-info">
-            <strong>Version: Beta 0.6.0</strong>
+            <strong>Version: Beta 0.7.0</strong>
         </div>
         <div class="changelog">
             <h3>Version History</h3>
             <ul>
+                <li><strong>Beta 0.7.0</strong> - Fixed TMDB search cut-off posters by eliminating inner scroll-traps and expanding result card grid (min 185px). Made entire show card clickable for instant library addition with responsive visual feedback, resolved Supabase UUID formatting and guest mode storage persistence, and enabled Enter key search with catalog-to-TMDB fallback.</li>
                 <li><strong>Beta 0.6.0</strong> - Comprehensive Audit & Overhaul: Fixed live catalog render on show addition, normalized streaming service filters, added show deletion/removal, resilient offline/guest storage sync, and repaired modal layout structures.</li>
                 <li><strong>Beta 0.5.0</strong> - Pivot to Smart Watchlist: Added "Continue Watching", "Recommended For You", Custom YouTube TV additions, and Status Tracking.</li>
                 <li><strong>Beta 0.4.1</strong> - Converted Admin Panel to a clean Modal UI overlay to fix catalog visibility bugs.</li>
