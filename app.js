@@ -334,11 +334,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const adminPassInput = document.getElementById('admin-pass-input');
     const adminVerifySubmitBtn = document.getElementById('admin-verify-submit-btn');
     const adminVerifyCancelBtn = document.getElementById('admin-verify-cancel-btn');
-    const adminSetupForm = document.getElementById('admin-setup-form');
-    const adminSetupPass = document.getElementById('admin-setup-pass');
-    const adminSetupConfirm = document.getElementById('admin-setup-confirm');
-    const adminSetupSubmitBtn = document.getElementById('admin-setup-submit-btn');
-    const adminSetupCancelBtn = document.getElementById('admin-setup-cancel-btn');
     const adminAuthError = document.getElementById('admin-auth-error');
     const adminAuthStatus = document.getElementById('admin-auth-status');
     const adminChangePass = document.getElementById('admin-change-pass');
@@ -347,6 +342,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const adminPassStatus = document.getElementById('admin-pass-status');
 
     // --- Hardened Cryptographic Admin Authentication & Rate Limiting ---
+    const ESTABLISHED_ADMIN_HASH = 'ef7b5399919988432dd0ecc566ed0f15c712bb830f5e786d76b3a2abc173a69f';
+    let isAdminAuthenticated = false;
+
+    function lockAdmin() {
+        isAdminAuthenticated = false;
+        sessionStorage.removeItem('tv_admin_authed');
+    }
+
     async function hashSha256(text) {
         const encoder = new TextEncoder();
         const data = encoder.encode(text);
@@ -356,6 +359,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function getStoredAdminHash() {
+        let hash = localStorage.getItem('tv_admin_password_hash');
+        if (hash) return hash;
+
         try {
             const cloudHash = await window.db.getSystemSetting('admin_password_hash');
             if (cloudHash) {
@@ -365,7 +371,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {
             console.warn("Could not retrieve admin password hash from cloud:", e);
         }
-        return localStorage.getItem('tv_admin_password_hash') || null;
+        localStorage.setItem('tv_admin_password_hash', ESTABLISHED_ADMIN_HASH);
+        return ESTABLISHED_ADMIN_HASH;
     }
 
     async function saveAdminHash(hash) {
@@ -423,7 +430,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function requireAdminAuth(callback) {
-        if (sessionStorage.getItem('tv_admin_authed') === 'true') {
+        if (isAdminAuthenticated) {
             if (typeof callback === 'function') callback();
             return;
         }
@@ -438,32 +445,20 @@ document.addEventListener('DOMContentLoaded', () => {
             adminAuthStatus.style.display = 'none';
         }
 
-        const storedHash = await getStoredAdminHash();
-        if (!storedHash) {
-            // Mode: Initial Setup
-            if (adminAuthTitle) adminAuthTitle.textContent = 'Setup Admin Password';
-            if (adminAuthDesc) adminAuthDesc.textContent = 'Create a secure master password to safeguard Settings and Version History. Only you will know this password.';
-            if (adminVerifyForm) adminVerifyForm.style.display = 'none';
-            if (adminSetupForm) adminSetupForm.style.display = 'block';
-            if (adminSetupPass) adminSetupPass.value = '';
-            if (adminSetupConfirm) adminSetupConfirm.value = '';
-            if (adminAuthModal) adminAuthModal.classList.remove('hidden');
-            setTimeout(() => { if (adminSetupPass) adminSetupPass.focus(); }, 100);
-        } else {
-            // Mode: Verification
-            if (adminAuthTitle) adminAuthTitle.textContent = 'Admin Access Required';
-            if (adminAuthDesc) adminAuthDesc.textContent = 'Enter your master admin password to continue.';
-            if (adminSetupForm) adminSetupForm.style.display = 'none';
-            if (adminVerifyForm) adminVerifyForm.style.display = 'block';
-            if (adminPassInput) {
-                adminPassInput.value = '';
-                adminPassInput.disabled = false;
-            }
-            if (adminVerifySubmitBtn) adminVerifySubmitBtn.disabled = false;
-            if (adminAuthModal) adminAuthModal.classList.remove('hidden');
-            if (!checkLockoutState()) {
-                setTimeout(() => { if (adminPassInput) adminPassInput.focus(); }, 100);
-            }
+        if (adminAuthTitle) adminAuthTitle.textContent = 'Admin Access Required';
+        if (adminAuthDesc) adminAuthDesc.textContent = 'Enter master admin password to unlock protected controls.';
+        if (adminVerifyForm) adminVerifyForm.style.display = 'block';
+        if (adminPassInput) {
+            adminPassInput.value = '';
+            adminPassInput.disabled = false;
+        }
+        if (adminVerifySubmitBtn) {
+            adminVerifySubmitBtn.disabled = false;
+            adminVerifySubmitBtn.textContent = 'Unlock';
+        }
+        if (adminAuthModal) adminAuthModal.classList.remove('hidden');
+        if (!checkLockoutState()) {
+            setTimeout(() => { if (adminPassInput) adminPassInput.focus(); }, 100);
         }
     }
 
@@ -480,8 +475,14 @@ document.addEventListener('DOMContentLoaded', () => {
         pendingAdminCallback = null;
     }
     async function init() {
+        lockAdmin();
         window.db.onAuthStateChange(async (event, session) => {
             currentUser = session?.user || null;
+            if (!currentUser) {
+                lockAdmin();
+                if (settingsModal) settingsModal.classList.add('hidden');
+                if (currentView === 'changelog') switchView('library');
+            }
             updateAuthUI();
             if (currentUser) {
                 await window.db.syncLocalStorageToCloud(currentUser.id);
@@ -525,6 +526,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Navigation & View Switching ---
     function switchView(viewName, targetService = null) {
+        if (viewName === 'changelog' && !isAdminAuthenticated) {
+            requireAdminAuth(() => switchView('changelog'));
+            return;
+        }
+
+        if (viewName !== 'changelog') {
+            lockAdmin();
+        }
+
         currentView = viewName;
 
         // Update navigation tabs
@@ -2325,7 +2335,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Auth Modals
         authBtn.addEventListener('click', async () => {
             if (currentUser) {
+                lockAdmin();
+                if (settingsModal) settingsModal.classList.add('hidden');
+                if (currentView === 'changelog') switchView('library');
                 await window.db.logout();
+                showToast("Logged out successfully.", "info");
             } else {
                 loginModal.classList.remove('hidden');
             }
@@ -2405,7 +2419,17 @@ document.addEventListener('DOMContentLoaded', () => {
         
         closeSettingsBtn.addEventListener('click', () => {
             settingsModal.classList.add('hidden');
+            lockAdmin();
         });
+
+        if (settingsModal) {
+            settingsModal.addEventListener('click', (e) => {
+                if (e.target === settingsModal) {
+                    settingsModal.classList.add('hidden');
+                    lockAdmin();
+                }
+            });
+        }
 
         // Header Version Badge Button (Password Protected)
         if (versionBtn) {
@@ -2419,6 +2443,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Close / Back Button from Inline Changelog
         if (closeChangelogBtn) {
             closeChangelogBtn.addEventListener('click', () => {
+                lockAdmin();
                 switchView('library');
             });
         }
@@ -2439,6 +2464,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+                if (settingsModal && !settingsModal.classList.contains('hidden')) {
+                    settingsModal.classList.add('hidden');
+                    lockAdmin();
+                }
                 if (imdbModal && !imdbModal.classList.contains('hidden')) {
                     closeImdbModal();
                 }
@@ -2455,56 +2484,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (adminVerifyCancelBtn) {
             adminVerifyCancelBtn.addEventListener('click', closeAdminAuthModal);
         }
-        if (adminSetupCancelBtn) {
-            adminSetupCancelBtn.addEventListener('click', closeAdminAuthModal);
-        }
         if (adminAuthModal) {
             adminAuthModal.addEventListener('click', (e) => {
                 if (e.target === adminAuthModal) closeAdminAuthModal();
-            });
-        }
-
-        // Admin Setup Form (Initial Password Creation)
-        if (adminSetupForm) {
-            adminSetupForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                adminAuthError.style.display = 'none';
-                adminAuthError.textContent = '';
-
-                const pass = adminSetupPass.value;
-                const confirm = adminSetupConfirm.value;
-
-                if (!pass || pass.length < 4) {
-                    adminAuthError.textContent = 'Password must be at least 4 characters.';
-                    adminAuthError.style.display = 'block';
-                    return;
-                }
-                if (pass !== confirm) {
-                    adminAuthError.textContent = 'Passwords do not match. Please verify.';
-                    adminAuthError.style.display = 'block';
-                    return;
-                }
-
-                adminSetupSubmitBtn.disabled = true;
-                adminSetupSubmitBtn.textContent = 'Saving...';
-                try {
-                    const hash = await hashSha256(pass);
-                    await saveAdminHash(hash);
-                    sessionStorage.setItem('tv_admin_authed', 'true');
-                    showToast('Admin password created successfully!', 'success');
-                    closeAdminAuthModal();
-                    if (typeof pendingAdminCallback === 'function') {
-                        const cb = pendingAdminCallback;
-                        pendingAdminCallback = null;
-                        cb();
-                    }
-                } catch (err) {
-                    adminAuthError.textContent = 'Error saving password: ' + err.message;
-                    adminAuthError.style.display = 'block';
-                } finally {
-                    adminSetupSubmitBtn.disabled = false;
-                    adminSetupSubmitBtn.textContent = 'Save Password';
-                }
             });
         }
 
@@ -2529,7 +2511,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (enteredHash === storedHash) {
                         failedAttempts = 0;
-                        sessionStorage.setItem('tv_admin_authed', 'true');
+                        isAdminAuthenticated = true;
                         closeAdminAuthModal();
                         if (typeof pendingAdminCallback === 'function') {
                             const cb = pendingAdminCallback;
@@ -2562,17 +2544,33 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update Admin Password from Settings Card
         if (updateAdminPassBtn) {
             updateAdminPassBtn.addEventListener('click', async () => {
+                const currentPassInput = document.getElementById('admin-current-pass');
+                const currentPass = currentPassInput ? currentPassInput.value : '';
                 const newPass = adminChangePass.value;
                 const confirmPass = adminChangeConfirm.value;
                 adminPassStatus.style.display = 'block';
 
+                if (!currentPass) {
+                    adminPassStatus.textContent = 'Current master password is required.';
+                    adminPassStatus.style.color = '#ff4444';
+                    return;
+                }
+
+                const currentHash = await hashSha256(currentPass);
+                const storedHash = await getStoredAdminHash();
+                if (currentHash !== storedHash) {
+                    adminPassStatus.textContent = 'Current master password is incorrect.';
+                    adminPassStatus.style.color = '#ff4444';
+                    return;
+                }
+
                 if (!newPass || newPass.length < 4) {
-                    adminPassStatus.textContent = 'Password must be at least 4 characters.';
+                    adminPassStatus.textContent = 'New password must be at least 4 characters.';
                     adminPassStatus.style.color = '#ff4444';
                     return;
                 }
                 if (newPass !== confirmPass) {
-                    adminPassStatus.textContent = 'Passwords do not match.';
+                    adminPassStatus.textContent = 'New passwords do not match.';
                     adminPassStatus.style.color = '#ff4444';
                     return;
                 }
@@ -2582,11 +2580,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     const newHash = await hashSha256(newPass);
                     await saveAdminHash(newHash);
-                    adminPassStatus.textContent = 'Admin password updated successfully!';
+                    adminPassStatus.textContent = 'Master password updated successfully!';
                     adminPassStatus.style.color = 'var(--success-color)';
+                    if (currentPassInput) currentPassInput.value = '';
                     adminChangePass.value = '';
                     adminChangeConfirm.value = '';
-                    showToast('Admin password updated successfully!', 'success');
+                    showToast('Master password updated successfully!', 'success');
                 } catch (err) {
                     adminPassStatus.textContent = 'Error updating password: ' + err.message;
                     adminPassStatus.style.color = '#ff4444';
@@ -2598,6 +2597,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         saveTmdbKeyBtn.addEventListener('click', async () => {
+            if (!isAdminAuthenticated) {
+                showToast("Admin authorization required to save system settings.", "error");
+                return;
+            }
             const key = tmdbApiKeyInput.value.trim();
             if (key) {
                 tmdbKeyStatus.textContent = 'Saving to cloud...';

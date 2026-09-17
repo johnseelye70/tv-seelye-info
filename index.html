@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=0.15.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=0.15.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=0.15.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=0.16.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=0.16.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=0.16.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=0.15.0">
+    <link rel="stylesheet" href="style.css?v=0.16.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -21,7 +21,7 @@
             <div class="logo-subline">
                 <span class="domain">tv.seelye.info</span>
                 <span class="logo-divider">•</span>
-                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 0.15.0</button>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 0.16.0</button>
             </div>
         </div>
         <div class="auth-section">
@@ -173,7 +173,7 @@
                     <div>
                         <div class="changelog-title-group">
                             <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
-                            <span class="changelog-current-badge">Beta 0.15.0</span>
+                            <span class="changelog-current-badge">Beta 0.16.0</span>
                         </div>
                         <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
                     </div>
@@ -186,8 +186,14 @@
                     <ul class="changelog-timeline-list">
                         <li class="changelog-entry">
                             <div class="changelog-entry-header">
-                                <span class="changelog-version-tag">Beta 0.15.0</span>
+                                <span class="changelog-version-tag">Beta 0.16.0</span>
                                 <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Hardened Session Lockout &amp; Master Password Enforcement:</strong> Resolved admin authorization persistence across account logouts by strictly clearing session privileges upon logout, settings closure, and view navigation. Sealed administrative settings by requiring the established master password for all protected access and added mandatory current-password verification before any password update.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 0.15.0</span>
                             </div>
                             <p class="changelog-desc"><strong>Header Version Button &amp; Administrative Password Protection:</strong> Relocated version indicator to the header alongside <code>tv.seelye.info</code> in matched typography and size. Converted version indicator into an interactive trigger that unlocks the comprehensive release history rendered 100% inline in accordance with zero-modal architecture. Safeguarded both Settings and Version History with master admin password protection, Web Crypto SHA-256 one-way hashing, cloud sync via <code>system_settings</code>, and 5-attempt rate-limited brute-force lockout safeguards.</p>
                         </li>
@@ -352,7 +358,11 @@
                 <!-- Admin Security Configuration -->
                 <div class="admin-card" id="admin-security-card" style="margin-top: 20px;">
                     <h3>Admin Security</h3>
-                    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 14px;">Manage your private master admin password used to safeguard Settings and Version History.</p>
+                    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 14px;">Update master admin password. Current master password is required.</p>
+                    <div class="input-group">
+                        <label for="admin-current-pass">Current Master Password</label>
+                        <input type="password" id="admin-current-pass" placeholder="Enter current master password" autocomplete="current-password">
+                    </div>
                     <div class="input-group">
                         <label for="admin-change-pass">New Master Password</label>
                         <input type="password" id="admin-change-pass" placeholder="Enter new master password (min 4 chars)" autocomplete="new-password">
@@ -373,8 +383,8 @@
         <div class="modal-content" style="max-width: 440px;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
                 <div>
-                    <h2 id="admin-auth-title" style="margin: 0; font-size: 1.35rem;">Admin Access</h2>
-                    <p id="admin-auth-desc" style="color: var(--text-muted); font-size: 0.86rem; margin-top: 5px; line-height: 1.4;">Enter your admin password to continue.</p>
+                    <h2 id="admin-auth-title" style="margin: 0; font-size: 1.35rem;">Admin Access Required</h2>
+                    <p id="admin-auth-desc" style="color: var(--text-muted); font-size: 0.86rem; margin-top: 5px; line-height: 1.4;">Enter master admin password to unlock protected controls.</p>
                 </div>
                 <span class="close-btn" id="close-admin-auth-btn" style="cursor: pointer; font-size: 1.5rem; line-height: 1;" title="Close">&times;</span>
             </div>
@@ -388,22 +398,6 @@
                 <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px;">
                     <button type="button" class="btn secondary-btn" id="admin-verify-cancel-btn">Cancel</button>
                     <button type="submit" class="btn primary-btn" id="admin-verify-submit-btn">Unlock</button>
-                </div>
-            </form>
-
-            <!-- Initial Setup Mode -->
-            <form id="admin-setup-form" style="display: none;">
-                <div class="input-group">
-                    <label for="admin-setup-pass">Create Master Password</label>
-                    <input type="password" id="admin-setup-pass" placeholder="Create master password (min 4 characters)" autocomplete="new-password" required>
-                </div>
-                <div class="input-group">
-                    <label for="admin-setup-confirm">Confirm Master Password</label>
-                    <input type="password" id="admin-setup-confirm" placeholder="Re-enter master password" autocomplete="new-password" required>
-                </div>
-                <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px;">
-                    <button type="button" class="btn secondary-btn" id="admin-setup-cancel-btn">Cancel</button>
-                    <button type="submit" class="btn primary-btn" id="admin-setup-submit-btn">Save Password</button>
                 </div>
             </form>
 
@@ -449,8 +443,8 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=0.15.0"></script>
-    <script src="db.js?v=0.15.0"></script>
-    <script src="app.js?v=0.15.0"></script>
+    <script src="service_catalog.js?v=0.16.0"></script>
+    <script src="db.js?v=0.16.0"></script>
+    <script src="app.js?v=0.16.0"></script>
 </body>
 </html>
