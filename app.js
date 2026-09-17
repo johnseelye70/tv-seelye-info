@@ -303,6 +303,180 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
     }
 
+    // =========================================================================
+    // --- Intelligent Streaming Service Detection & Auto-Resolution Engine ---
+    // =========================================================================
+
+    function extractServiceFromTmdbDetails(details) {
+        if (!details) return null;
+
+        // 1. Check US flatrate watch providers
+        const usFlatrate = details['watch/providers']?.results?.US?.flatrate 
+            || details.watch_providers?.results?.US?.flatrate;
+        if (Array.isArray(usFlatrate) && usFlatrate.length > 0) {
+            for (const prov of usFlatrate) {
+                const pName = (prov.provider_name || '').toLowerCase();
+                if (pName.includes('disney')) return 'disney';
+                if (pName.includes('netflix')) return 'netflix';
+                if (pName.includes('apple')) return 'appletv';
+                if (pName.includes('hulu')) return 'hulu';
+                if (pName.includes('peacock')) return 'peacock';
+                if (pName.includes('amazon') || pName.includes('prime')) return 'prime';
+                if (pName.includes('youtube')) return 'youtube';
+            }
+        }
+
+        // 2. Check production / original networks
+        if (Array.isArray(details.networks) && details.networks.length > 0) {
+            for (const net of details.networks) {
+                const nName = (net.name || '').toLowerCase();
+                const nId = String(net.id);
+                if (nId === '2739' || nName.includes('disney')) return 'disney';
+                if (nId === '213' || nName.includes('netflix')) return 'netflix';
+                if (nId === '2552' || nName.includes('apple')) return 'appletv';
+                if (nId === '453' || nName.includes('hulu') || nId === '88' || nName.includes('fx')) return 'hulu';
+                if (nId === '3353' || nName.includes('peacock') || nId === '6' || nName.includes('nbc')) return 'peacock';
+                if (nId === '1024' || nName.includes('amazon') || nName.includes('prime')) return 'prime';
+                if (nId === '247' || nName.includes('youtube')) return 'youtube';
+            }
+        }
+
+        return null;
+    }
+
+    function detectShowServiceSync(item) {
+        if (!item) return null;
+        const tmdbId = String(item.id || item.tmdb_id || '');
+        const title = (item.title || item.name || '').toLowerCase().trim();
+
+        // 1. Direct explicit service key
+        if (item.service && serviceMeta[item.service]) return item.service;
+        if (item.mock_service) {
+            const ms = item.mock_service.toLowerCase().trim();
+            if (!['unknown', 'none / unknown', 'custom', 'recommended'].includes(ms)) {
+                for (const [k, meta] of Object.entries(serviceMeta)) {
+                    if (ms.includes(k) || ms.includes(meta.name.toLowerCase())) return k;
+                }
+            }
+        }
+
+        // 2. Check window.SERVICE_CATALOG across all services
+        if (typeof window !== 'undefined' && window.SERVICE_CATALOG) {
+            for (const [svcKey, shows] of Object.entries(window.SERVICE_CATALOG)) {
+                if (Array.isArray(shows)) {
+                    for (const s of shows) {
+                        if (tmdbId && String(s.id) === tmdbId) return svcKey;
+                        if (title && s.title && s.title.toLowerCase().trim() === title) return svcKey;
+                    }
+                }
+            }
+        }
+
+        // 3. Check SHOW_METADATA curated entries
+        if (typeof SHOW_METADATA !== 'undefined' && tmdbId && SHOW_METADATA[tmdbId]?.service) {
+            return SHOW_METADATA[tmdbId].service;
+        }
+
+        // 4. Curated Franchise & Title Heuristics
+        if (title) {
+            // Disney+ (Star Wars, Marvel, Pixar, Disney)
+            if (/star wars|ahsoka|mandalorian|andor|obi-wan|clone wars|bad batch|boba fett|skeleton crew|acolyte|tales of the jedi|resistance|visions/.test(title)) return 'disney';
+            if (/wandavision|loki|moon knight|hawkeye|ms\. marvel|she-hulk|secret invasion|agatha|daredevil|ironheart|echo|what if\.\.\./.test(title)) return 'disney';
+            if (/percy jackson|monsters at work|dug days|win or lose|baymax|tangled|gravity falls|phineas and ferb|bluey|ducktails/.test(title)) return 'disney';
+
+            // Apple TV+ originals
+            if (/ted lasso|severance|slow horses|silo|morning show|for all mankind|shrinking|foundation|bad sisters|black bird|pachinko|sugar|presumed innocent|defending jacob|monarch: legacy|dickinson|servant|loot|palm royale/.test(title)) return 'appletv';
+
+            // Netflix originals
+            if (/stranger things|squid game|wednesday|bridgerton|the crown|ozark|witcher|black mirror|narcos|queen's gambit|dark|mindhunter|bojack|cobra kai|money heist|heartstopper|outer banks|lucifer|beef|one piece|you|dead to me|sweet tooth|sex education|umbrella academy/.test(title)) return 'netflix';
+
+            // Hulu & FX originals
+            if (/the bear|only murders in the building|shogun|fargo|handmaid's tale|dopesick|nine perfect strangers|normal people|little fires everywhere|reservation dogs|what we do in the shadows|american horror story|atlanta|justified|snowfall/.test(title)) return 'hulu';
+
+            // Prime Video originals
+            if (/the boys|reacher|fallout|rings of power|invincible|wheel of time|fleabag|marvelous mrs\. maisel|good omens|jack ryan|terminal list|upload|the expanse|outer range|bosch|mr\. & mrs\. smith|gen v/.test(title)) return 'prime';
+
+            // Peacock & NBC originals/classics
+            if (/yellowstone|poker face|the office|parks and recreation|battlestar galactica|ted|twisted metal|bel-air|monk|columbo|psych|brooklyn nine-nine|30 rock|community|suits|dr\. death/.test(title)) return 'peacock';
+        }
+
+        return null;
+    }
+
+    function resolveItemServiceName(item) {
+        if (!item) return 'Unknown';
+        let serviceName = item.streaming_services?.name || item.mock_service;
+        if (!serviceName || ['unknown', 'none / unknown', 'custom', 'recommended'].includes(String(serviceName).toLowerCase().trim())) {
+            const detectedKey = detectShowServiceSync(item);
+            if (detectedKey && serviceMeta[detectedKey]) {
+                serviceName = serviceMeta[detectedKey].name;
+                item.mock_service = serviceName; // update in-memory item
+            } else {
+                serviceName = 'Unknown';
+            }
+        }
+        return serviceName;
+    }
+
+    async function healLibraryServices() {
+        if (!allContent || allContent.length === 0) return;
+        let changed = false;
+        const cloudKey = await window.db.getSystemSetting('tmdb_api_key') || localStorage.getItem('tmdb_api_key');
+        const localLib = window.db.getLocalLibrary();
+        let localLibUpdated = false;
+
+        for (const item of allContent) {
+            const currentService = item.streaming_services?.name || item.mock_service;
+            const isUnknown = !currentService || ['unknown', 'none / unknown', 'custom', 'recommended'].includes(String(currentService).toLowerCase().trim());
+            
+            if (isUnknown) {
+                let detectedKey = detectShowServiceSync(item);
+                if (!detectedKey && cloudKey && item.tmdb_id && !String(item.tmdb_id).startsWith('custom_')) {
+                    try {
+                        const res = await fetch(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${cloudKey}&append_to_response=watch/providers`);
+                        if (res.ok) {
+                            const det = await res.json();
+                            detectedKey = extractServiceFromTmdbDetails(det);
+                        }
+                    } catch(e) {}
+                }
+
+                if (detectedKey && serviceMeta[detectedKey]) {
+                    const properName = serviceMeta[detectedKey].name;
+                    item.mock_service = properName;
+                    changed = true;
+
+                    // Update local storage
+                    const idx = localLib.findIndex(l => String(l.id) === String(item.id) || (l.title && l.title.toLowerCase() === (item.title || '').toLowerCase()));
+                    if (idx >= 0) {
+                        localLib[idx].mock_service = properName;
+                        localLibUpdated = true;
+                    }
+
+                    // Update Supabase if available
+                    if (window.db?.supabaseClient && currentUser) {
+                        try {
+                            const matchedSvc = allServices.find(s => s.name.toLowerCase().includes(detectedKey));
+                            if (matchedSvc) {
+                                item.streaming_service_id = matchedSvc.id;
+                                window.db.supabaseClient.from('content_items').update({ streaming_service_id: matchedSvc.id }).eq('id', item.id).then(() => {});
+                            }
+                        } catch(e) {}
+                    }
+                }
+            }
+        }
+
+        if (localLibUpdated) {
+            window.db.saveLocalLibrary(localLib);
+        }
+
+        if (changed) {
+            updateLibraryCounters();
+            renderLibrary();
+        }
+    }
+
     // Admin Elements
     const addShowsBtn = document.getElementById('add-shows-btn');
     const settingsBtn = document.getElementById('settings-btn');
@@ -516,6 +690,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         allServices = await window.db.getStreamingServices();
         allContent = await window.db.getContentItems();
+        await healLibraryServices();
 
         await loadUserData();
         setupEventListeners();
@@ -620,7 +795,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = watchData.status;
         const rating = watchData.rating;
         
-        const serviceName = item.streaming_services?.name || item.mock_service || 'Unknown';
+        const serviceName = resolveItemServiceName(item);
         const year = item.release_year || 'N/A';
         const poster = item.poster_url || 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(item.title);
         
@@ -677,8 +852,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function matchesServiceFilter(item, filter) {
         if (!filter || filter === 'all') return true;
-        const rawName = (item.streaming_services?.name || item.mock_service || '').toLowerCase().trim();
-        if (!rawName) return false;
+        const resolvedName = resolveItemServiceName(item);
+        const rawName = resolvedName.toLowerCase().trim();
+        if (!rawName || rawName === 'unknown') return false;
 
         const norm = filter.toLowerCase().trim();
         if (norm === 'disney') return rawName.includes('disney');
@@ -1092,7 +1268,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 modalAddBtn.textContent = 'Adding...';
                 modalAddBtn.disabled = true;
 
-                const svcName = item.service ? (serviceMeta[item.service]?.name || item.service) : 'Custom';
+                let detectedKey = item.service || detectShowServiceSync(item) || extractServiceFromTmdbDetails(details);
+                const svcName = (detectedKey && serviceMeta[detectedKey]) ? serviceMeta[detectedKey].name : (details?.networks?.[0]?.name || item.service || 'Custom');
                 const payload = {
                     id: uuid,
                     tmdb_id: tmdbId,
@@ -2263,6 +2440,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Quick Add from Recommendations
             if (e.target.classList.contains('add-rec-btn')) {
                 const btn = e.target;
+                const showItem = { id: String(btn.dataset.tmdbid), title: btn.dataset.title };
+                const detectedKey = detectShowServiceSync(showItem);
+                const svcName = (detectedKey && serviceMeta[detectedKey]) ? serviceMeta[detectedKey].name : 'Recommended';
                 const payload = {
                     id: String(btn.dataset.tmdbid),
                     title: btn.dataset.title,
@@ -2270,7 +2450,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     release_year: parseInt(btn.dataset.year) || null,
                     poster_url: btn.dataset.poster,
                     service_id: null,
-                    mock_service: 'Recommended'
+                    mock_service: svcName
                 };
                 btn.textContent = "Adding...";
                 btn.disabled = true;
@@ -2788,7 +2968,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const showName = item.name || item.title || 'Untitled';
             const cleanTitle = showName.replace(/"/g, '&quot;');
             const overview = item.overview ? (item.overview.length > 95 ? item.overview.slice(0, 95) + '...' : item.overview) : '';
-            const initialService = item.service || defaultService || '';
+            const detectedKey = detectShowServiceSync(item) || item.service || defaultService || '';
+            const initialService = detectedKey;
             
             const tmdbId = String(item.id);
             const uuid = window.db?.toDeterministicUuid ? window.db.toDeterministicUuid(tmdbId) : tmdbId;
@@ -2811,7 +2992,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${overview ? `<div class="tmdb-overview">${overview}</div>` : ''}
                     
                     <div class="tmdb-service-row" onclick="event.stopPropagation();">
-                        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 2px;">Service</label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                            <label style="font-size: 0.75rem; color: var(--text-muted); display: block;">Service</label>
+                            ${detectedKey ? `<span style="font-size: 0.72rem; color: var(--accent-color); font-weight: 500;">✓ ${serviceMeta[detectedKey]?.name || detectedKey}</span>` : ''}
+                        </div>
                         <select class="admin-select-dropdown" id="service-${item.id}">
                             <option value="">None / Unknown</option>
                             ${serviceOptions}
@@ -2831,6 +3015,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
 
+            // Background provider enrichment if not known upfront
+            if (!detectedKey) {
+                const cloudKey = localStorage.getItem('tmdb_api_key');
+                if (cloudKey && !tmdbId.startsWith('custom_')) {
+                    fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${cloudKey}&append_to_response=watch/providers`)
+                        .then(r => r.ok ? r.json() : null)
+                        .then(det => {
+                            if (det) {
+                                const asyncKey = extractServiceFromTmdbDetails(det);
+                                if (asyncKey) {
+                                    const sel = document.getElementById(`service-${item.id}`);
+                                    if (sel && (!sel.value || sel.value === '')) {
+                                        sel.value = asyncKey;
+                                    }
+                                }
+                            }
+                        })
+                        .catch(() => {});
+                }
+            }
+
             const handleAddShow = async (btnEl) => {
                 if (card.classList.contains('adding')) return;
 
@@ -2847,8 +3052,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const serviceSelect = document.getElementById(`service-${item.id}`);
-                const serviceId = serviceSelect?.value || initialService || '';
+                let serviceId = serviceSelect?.value || initialService || detectShowServiceSync(item) || '';
+
+                if (!serviceId) {
+                    const key = await window.db.getSystemSetting('tmdb_api_key') || localStorage.getItem('tmdb_api_key');
+                    if (key && tmdbId && !tmdbId.startsWith('custom_')) {
+                        try {
+                            const detRes = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${key}&append_to_response=watch/providers`);
+                            if (detRes.ok) {
+                                const det = await detRes.json();
+                                serviceId = extractServiceFromTmdbDetails(det) || '';
+                            }
+                        } catch(e) {}
+                    }
+                }
+
                 const isCustomName = ['youtube', 'netflix', 'disney', 'peacock', 'hulu', 'prime', 'appletv'].includes(serviceId);
+                const resolvedServiceName = isCustomName ? (serviceMeta[serviceId]?.name || serviceId) : (serviceId || 'Unknown');
 
                 const payload = {
                     id: uuid,
@@ -2858,7 +3078,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     release_year: parseInt(year) || null,
                     poster_url: poster,
                     streaming_service_id: isCustomName ? null : (serviceId || null),
-                    mock_service: isCustomName ? (serviceMeta[serviceId]?.name || serviceId) : null
+                    mock_service: resolvedServiceName
                 };
 
                 const { data, error } = await window.db.insertContentItem(payload);
