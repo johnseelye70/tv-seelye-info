@@ -519,8 +519,8 @@ document.addEventListener('DOMContentLoaded', () => {
             authStatusBadge.classList.remove('logged-in');
             authBtn.textContent = 'Login';
         }
-        // Always make Add Shows and Settings buttons accessible
-        addShowsBtn.classList.remove('hidden');
+        // Always make Settings button accessible
+        if (addShowsBtn) addShowsBtn.classList.remove('hidden');
         settingsBtn.classList.remove('hidden');
     }
 
@@ -2395,9 +2395,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // --- Admin / Modal Logic ---
-        addShowsBtn.addEventListener('click', () => {
-            addShowsModal.classList.remove('hidden');
-        });
+        if (addShowsBtn) {
+            addShowsBtn.addEventListener('click', () => {
+                addShowsModal.classList.remove('hidden');
+            });
+        }
         
         closeAddShowsBtn.addEventListener('click', () => {
             addShowsModal.classList.add('hidden');
