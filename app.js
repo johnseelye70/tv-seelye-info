@@ -877,6 +877,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (typeof updateRokuRemoteHeaderDisplay === 'function') {
                 updateRokuRemoteHeaderDisplay();
             }
+            if (window.RokuECP && !window.RokuECP.isConfigured()) {
+                const cfgPanel = document.getElementById('remote-inline-config');
+                if (cfgPanel) cfgPanel.style.display = 'block';
+            }
         } else if (viewName === 'changelog') {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -1721,10 +1725,14 @@ document.addEventListener('DOMContentLoaded', () => {
         epRokuBtns.forEach(btn => {
             btn.addEventListener('click', async () => {
                 if (!window.RokuECP || !window.RokuECP.isConfigured()) {
-                    showToast('Please configure your Roku IP in Settings first.', 'error');
-                    requireAdminAuth(() => {
-                        if (settingsModal) settingsModal.classList.remove('hidden');
-                    });
+                    showToast('Please set your Roku IP address first (no password needed).', 'info');
+                    switchView('remote');
+                    if (typeof window.openRemoteInlineConfig === 'function') {
+                        window.openRemoteInlineConfig();
+                    } else {
+                        const cfg = document.getElementById('remote-inline-config');
+                        if (cfg) cfg.style.display = 'block';
+                    }
                     return;
                 }
 
@@ -4055,6 +4063,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (typeof updateRokuRemoteHeaderDisplay === 'function') {
                     updateRokuRemoteHeaderDisplay();
                 }
+                const inlineIp = document.getElementById('remote-cfg-ip-address');
+                const inlineName = document.getElementById('remote-cfg-device-name');
+                if (inlineIp) inlineIp.value = ip;
+                if (inlineName) inlineName.value = name;
             });
         }
 
@@ -4226,19 +4238,94 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Configure link in remote header
+        // Configure link & inline setup in remote header (Open - Zero master password required)
         const remoteSettingsLinkBtn = document.getElementById('remote-settings-link-btn');
+        const remoteInlineConfig = document.getElementById('remote-inline-config');
+        const remoteCfgCloseBtn = document.getElementById('remote-cfg-close-btn');
+        const remoteCfgDeviceName = document.getElementById('remote-cfg-device-name');
+        const remoteCfgIpAddress = document.getElementById('remote-cfg-ip-address');
+        const remoteCfgSaveBtn = document.getElementById('remote-cfg-save-btn');
+        const remoteCfgTestBtn = document.getElementById('remote-cfg-test-btn');
+        const remoteCfgStatus = document.getElementById('remote-cfg-status');
+
+        function openRemoteInlineConfig() {
+            if (!remoteInlineConfig) return;
+            remoteInlineConfig.style.display = 'block';
+            if (remoteCfgDeviceName && window.RokuECP) remoteCfgDeviceName.value = window.RokuECP.getName();
+            if (remoteCfgIpAddress && window.RokuECP) remoteCfgIpAddress.value = window.RokuECP.getIp();
+            if (remoteCfgStatus) remoteCfgStatus.textContent = '';
+            if (remoteCfgIpAddress) {
+                setTimeout(() => {
+                    remoteCfgIpAddress.focus();
+                }, 100);
+            }
+        }
+        window.openRemoteInlineConfig = openRemoteInlineConfig;
+
+        function closeRemoteInlineConfig() {
+            if (remoteInlineConfig) remoteInlineConfig.style.display = 'none';
+        }
+
         if (remoteSettingsLinkBtn) {
             remoteSettingsLinkBtn.addEventListener('click', () => {
-                requireAdminAuth(() => {
-                    if (settingsModal) {
-                        settingsModal.classList.remove('hidden');
-                        const rokuIpInput = document.getElementById('roku-ip-address');
-                        const rokuNameInput = document.getElementById('roku-device-name');
-                        if (rokuIpInput && window.RokuECP) rokuIpInput.value = window.RokuECP.getIp();
-                        if (rokuNameInput && window.RokuECP) rokuNameInput.value = window.RokuECP.getName();
+                if (remoteInlineConfig && remoteInlineConfig.style.display !== 'none') {
+                    closeRemoteInlineConfig();
+                } else {
+                    openRemoteInlineConfig();
+                }
+            });
+        }
+
+        if (remoteCfgCloseBtn) {
+            remoteCfgCloseBtn.addEventListener('click', closeRemoteInlineConfig);
+        }
+
+        if (remoteCfgSaveBtn) {
+            remoteCfgSaveBtn.addEventListener('click', () => {
+                if (!window.RokuECP) return;
+                const ip = (remoteCfgIpAddress ? remoteCfgIpAddress.value : '').trim();
+                const name = (remoteCfgDeviceName ? remoteCfgDeviceName.value : '').trim() || 'My Roku';
+                window.RokuECP.setIp(ip);
+                window.RokuECP.setName(name);
+                showToast(`Saved Roku: ${name} (${ip || 'No IP'})`, 'success');
+                if (typeof updateRokuRemoteHeaderDisplay === 'function') {
+                    updateRokuRemoteHeaderDisplay();
+                }
+                const adminRokuIp = document.getElementById('roku-ip-address');
+                const adminRokuName = document.getElementById('roku-device-name');
+                if (adminRokuIp) adminRokuIp.value = ip;
+                if (adminRokuName) adminRokuName.value = name;
+                if (remoteCfgStatus) {
+                    remoteCfgStatus.textContent = '✓ Configuration saved successfully!';
+                    remoteCfgStatus.style.color = 'var(--success-color)';
+                }
+            });
+        }
+
+        if (remoteCfgTestBtn) {
+            remoteCfgTestBtn.addEventListener('click', async () => {
+                if (!window.RokuECP) return;
+                const ip = (remoteCfgIpAddress ? remoteCfgIpAddress.value : '').trim();
+                if (ip) window.RokuECP.setIp(ip);
+                if (remoteCfgStatus) {
+                    remoteCfgStatus.textContent = 'Pinging Roku device...';
+                    remoteCfgStatus.style.color = 'var(--text-muted)';
+                }
+                const res = await window.RokuECP.testConnection();
+                if (remoteCfgStatus) {
+                    if (res.success) {
+                        remoteCfgStatus.textContent = `✓ ${res.message}`;
+                        remoteCfgStatus.style.color = 'var(--success-color)';
+                        showToast('Roku command dispatched successfully!', 'success');
+                    } else {
+                        remoteCfgStatus.textContent = `✕ ${res.message}`;
+                        remoteCfgStatus.style.color = 'var(--danger-color, #ef4444)';
+                        showToast(res.message, 'error');
                     }
-                });
+                }
+                if (typeof updateRokuRemoteHeaderDisplay === 'function') {
+                    updateRokuRemoteHeaderDisplay();
+                }
             });
         }
 
