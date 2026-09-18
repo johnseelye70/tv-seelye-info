@@ -7,6 +7,7 @@ const SUPABASE_ANON_KEY = window.ENV_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsI
 let supabaseClient;
 try {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    window.supabaseClient = supabaseClient;
 } catch (e) {
     console.error("Supabase Initialization Error. Please ensure SUPABASE_URL starts with https://", e);
 }
@@ -33,6 +34,7 @@ function toDeterministicUuid(id) {
 
 const db = {
     toDeterministicUuid,
+    getClient: () => supabaseClient,
     // Auth logic
     async login(email, password) {
         if (!supabaseClient) return { error: new Error('Database not connected. Please check your internet or ad-blocker.') };

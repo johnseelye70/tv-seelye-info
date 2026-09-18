@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2.2.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=2.2.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2.2.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2.3.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=2.3.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2.3.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=2.2.0">
+    <link rel="stylesheet" href="style.css?v=2.3.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -29,7 +29,7 @@
             <div class="logo-subline">
                 <span class="domain">tv.seelye.info</span>
                 <span class="logo-divider">•</span>
-                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 2.2.0</button>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 2.3.0</button>
             </div>
         </div>
         <div class="auth-section">
@@ -257,6 +257,7 @@
                         <div class="remote-device-badge">
                             <span class="remote-status-dot" id="remote-status-dot"></span>
                             <span class="remote-device-name" id="remote-device-name-display">My Roku</span>
+                            <span id="remote-bridge-badge" class="status-pill" style="font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); color: var(--text-muted); border: 1px solid rgba(255, 255, 255, 0.15);">⚪ Checking Bridge...</span>
                         </div>
                         <div class="remote-ip-label" id="remote-ip-display">IP: Not Configured</div>
                     </div>
@@ -274,6 +275,20 @@
                         <button type="button" id="remote-cfg-close-btn" class="close-btn" style="cursor: pointer; font-size: 1.4rem; line-height: 1; padding: 0 4px; background: none; border: none; color: var(--text-muted);" title="Close Setup">&times;</button>
                     </div>
                     <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px; line-height: 1.4;">Connect directly to your Roku TV over your home Wi-Fi. Open to your local network &mdash; no master password required.</p>
+
+                    <!-- Bridge Relay Status Card -->
+                    <div id="remote-bridge-info-card" style="margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px dashed rgba(16,185,129,0.35);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <span style="font-size: 0.78rem; color: #10b981; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                                <span id="remote-bridge-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #9ca3af; display: inline-block;"></span>
+                                Local PC Hardware Bridge
+                            </span>
+                            <span id="remote-bridge-state-text" style="font-size: 0.75rem; color: #9ca3af; font-weight: 500;">Checking...</span>
+                        </div>
+                        <p id="remote-bridge-desc" style="color: var(--text-muted); font-size: 0.76rem; margin: 0; line-height: 1.4;">
+                            Bypasses mobile browser HTTPS mixed-content blocks by relaying commands from your phone to this PC via Supabase Realtime WebSocket, then dispatching to your Roku on port 8060.
+                        </p>
+                    </div>
 
                     <!-- Quick Detected Device Presets -->
                     <div style="margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px dashed rgba(0,195,255,0.25);">
@@ -439,7 +454,7 @@
                     <div>
                         <div class="changelog-title-group">
                             <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
-                            <span class="changelog-current-badge">Beta 2.2.0</span>
+                            <span class="changelog-current-badge">Beta 2.3.0</span>
                         </div>
                         <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
                     </div>
@@ -452,8 +467,14 @@
                     <ul class="changelog-timeline-list">
                         <li class="changelog-entry">
                             <div class="changelog-entry-header">
-                                <span class="changelog-version-tag">Beta 2.2.0</span>
+                                <span class="changelog-version-tag">Beta 2.3.0</span>
                                 <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Local PC Hardware Bridge &amp; Real-Time Relay Subsystem:</strong> Built an ultra-low-latency local Roku hardware bridge daemon (<code>roku-bridge.js</code> / <code>start-roku-bridge.bat</code>) running on the local network. Utilizing Supabase Realtime WebSocket broadcast channels, the bridge seamlessly receives remote keypresses, streaming app launches (Netflix, Disney+, Hulu, etc.), and episode casting commands from mobile browsers (iOS Safari / Android) over HTTPS without mixed-content or Private Network Access (PNA) restrictions, dispatching them directly to local Roku TVs on port 8060 in under 20ms. Features live bridge heartbeat monitoring, visual connection status pills, and automatic direct LAN fallback.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 2.2.0</span>
                             </div>
                             <p class="changelog-desc"><strong>Multi-Vector LAN Dispatching &amp; Home Device Auto-Presets:</strong> Upgraded the client-side Roku ECP engine with multi-channel network dispatching (combining hidden-frame form submission, beacon POSTs, and asynchronous fetches) to bypass mobile browser active mixed-content promise rejections when sending commands to local Roku devices over Wi-Fi. Added auto-detected home network presets for Roku Ultra 4850 (<code>192.168.50.9</code>) and Roku Ultra (<code>192.168.50.32</code>), plus direct in-app guidance for enabling Roku&rsquo;s &ldquo;Control by mobile apps&rdquo; permissive mode.</p>
                         </li>
@@ -838,9 +859,9 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=2.2.0"></script>
-    <script src="db.js?v=2.2.0"></script>
-    <script src="roku.js?v=2.2.0"></script>
-    <script src="app.js?v=2.2.0"></script>
+    <script src="service_catalog.js?v=2.3.0"></script>
+    <script src="db.js?v=2.3.0"></script>
+    <script src="roku.js?v=2.3.0"></script>
+    <script src="app.js?v=2.3.0"></script>
 </body>
 </html>

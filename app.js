@@ -4206,12 +4206,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const dot = document.getElementById('remote-status-dot');
         const nameDisplay = document.getElementById('remote-device-name-display');
         const ipDisplay = document.getElementById('remote-ip-display');
+        const bridgeBadge = document.getElementById('remote-bridge-badge');
+        const remoteBridgeDot = document.getElementById('remote-bridge-dot');
+        const remoteBridgeStateText = document.getElementById('remote-bridge-state-text');
+        const remoteBridgeDesc = document.getElementById('remote-bridge-desc');
 
         if (!window.RokuECP) return;
 
         const isConfig = window.RokuECP.isConfigured();
         const ip = window.RokuECP.getIp();
         const name = window.RokuECP.getName();
+        const bridge = (typeof window.RokuECP.getBridgeStatus === 'function') ? window.RokuECP.getBridgeStatus() : { online: false };
 
         if (dot) {
             dot.classList.toggle('unconfigured', !isConfig);
@@ -4219,8 +4224,45 @@ document.addEventListener('DOMContentLoaded', () => {
         if (nameDisplay) {
             nameDisplay.textContent = name;
         }
-        if (ipDisplay) {
-            ipDisplay.textContent = isConfig ? `Target: http://${ip}:8060` : 'IP: Not Configured (Tap ⚙️ Configure)';
+
+        if (bridge && bridge.online) {
+            if (bridgeBadge) {
+                bridgeBadge.style.display = 'inline-flex';
+                bridgeBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+                bridgeBadge.style.color = '#10b981';
+                bridgeBadge.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+                bridgeBadge.textContent = `🟢 PC Bridge (${bridge.hostIp || 'Active'})`;
+            }
+            if (ipDisplay) {
+                ipDisplay.textContent = isConfig ? `Target: ${name} (${ip}:8060) • Relay: PC Bridge` : 'IP: Not Configured (Tap ⚙️ Configure)';
+            }
+            if (remoteBridgeDot) remoteBridgeDot.style.background = '#10b981';
+            if (remoteBridgeStateText) {
+                remoteBridgeStateText.textContent = `✓ Online (${bridge.hostIp || 'PC Bridge'})`;
+                remoteBridgeStateText.style.color = '#10b981';
+            }
+            if (remoteBridgeDesc) {
+                remoteBridgeDesc.innerHTML = `Bridge running on <strong>${bridge.hostIp}</strong> (${bridge.hostname || 'PC'}). Commands from phone/browser bypass HTTPS mixed-content blocks and trigger TV in &lt;20ms.`;
+            }
+        } else {
+            if (bridgeBadge) {
+                bridgeBadge.style.display = 'inline-flex';
+                bridgeBadge.style.background = 'rgba(255, 255, 255, 0.08)';
+                bridgeBadge.style.color = 'var(--text-muted)';
+                bridgeBadge.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                bridgeBadge.textContent = '⚪ Direct LAN Mode';
+            }
+            if (ipDisplay) {
+                ipDisplay.textContent = isConfig ? `Target: http://${ip}:8060` : 'IP: Not Configured (Tap ⚙️ Configure)';
+            }
+            if (remoteBridgeDot) remoteBridgeDot.style.background = '#9ca3af';
+            if (remoteBridgeStateText) {
+                remoteBridgeStateText.textContent = 'Bridge Offline (Direct LAN)';
+                remoteBridgeStateText.style.color = '#9ca3af';
+            }
+            if (remoteBridgeDesc) {
+                remoteBridgeDesc.textContent = 'Bridge daemon not detected. Run "start-roku-bridge.bat" on your PC to enable instant mobile HTTPS relaying.';
+            }
         }
     }
 
@@ -4229,6 +4271,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!remoteView) return;
 
         updateRokuRemoteHeaderDisplay();
+
+        if (window.RokuECP && typeof window.RokuECP.onBridgeStatusChange === 'function') {
+            window.RokuECP.onBridgeStatusChange(() => {
+                updateRokuRemoteHeaderDisplay();
+            });
+        }
 
         // Remote Header Button
         const remoteHeaderBtn = document.getElementById('remote-header-btn');

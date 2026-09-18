@@ -1,0 +1,14 @@
+{
+  "name": "tv-seelye-info",
+  "version": "2.3.0",
+  "private": true,
+  "description": "Seelye TV Hub & Local Roku Bridge Subsystem",
+  "scripts": {
+    "bridge": "node roku-bridge.js",
+    "start": "node roku-bridge.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.109.0",
+    "ws": "^8.21.3"
+  }
+}

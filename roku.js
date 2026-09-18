@@ -1,6 +1,6 @@
 /**
  * Roku External Control Protocol (ECP) Client Engine
- * tv.seelye.info - Beta 2.0.0
+ * tv.seelye.info - Beta 2.3.0
  * 
  * Provides direct client-side LAN communication with Roku streaming devices.
  * Supports remote keypresses, app launching, universal search, and episode playback targeting.
@@ -22,6 +22,140 @@ const RokuECP = (function () {
         youtube: { id: '837', name: 'YouTube', color: '#ff0000' },
         max: { id: '61322', name: 'Max', color: '#002be7' }
     };
+
+    // Supabase Realtime Relay Configuration
+    const RELAY_CHANNEL_NAME = 'seelye-roku-relay';
+    let relayChannel = null;
+    const bridgeStatus = {
+        online: false,
+        hostIp: '',
+        hostname: '',
+        version: '',
+        lastHeartbeat: 0,
+        commandsHandled: 0
+    };
+    const bridgeListeners = [];
+
+    /**
+     * Initializes the Supabase Realtime Relay WebSocket connection.
+     */
+    function initRelay() {
+        let client = (typeof window !== 'undefined' && window.supabaseClient) ? window.supabaseClient : null;
+        if (!client && typeof window !== 'undefined' && window.db && typeof window.db.getClient === 'function') {
+            client = window.db.getClient();
+        }
+        if (!client && typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
+            const url = window.ENV_SUPABASE_URL || 'https://nmawldbjspiefwcnykuk.supabase.co';
+            const key = window.ENV_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tYXdsZGJqc3BpZWZ3Y255a3VrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Njc5OTUsImV4cCI6MjEwMjA0Mzk5NX0.m67NQPyXjtbaoeXSUiUUUm8lbEJgO3NXJIlMeJTVnNU';
+            try {
+                client = window.supabase.createClient(url, key);
+                window.supabaseClient = client;
+            } catch (e) {}
+        }
+
+        if (!client) {
+            setTimeout(initRelay, 500);
+            return;
+        }
+
+        if (relayChannel) return;
+
+        try {
+            relayChannel = client.channel(RELAY_CHANNEL_NAME);
+
+            // Listen for bridge heartbeats
+            relayChannel.on('broadcast', { event: 'bridge-heartbeat' }, ({ payload }) => {
+                if (!payload) return;
+                bridgeStatus.online = true;
+                bridgeStatus.hostIp = payload.hostIp || '';
+                bridgeStatus.hostname = payload.hostname || '';
+                bridgeStatus.version = payload.version || '';
+                bridgeStatus.commandsHandled = payload.commandsHandled || 0;
+                bridgeStatus.lastHeartbeat = Date.now();
+                notifyBridgeListeners();
+            });
+
+            // Listen for command ACKs
+            relayChannel.on('broadcast', { event: 'roku-ack' }, ({ payload }) => {
+                if (payload && typeof window !== 'undefined') {
+                    console.log(`[RokuECP] Bridge ACK: ${payload.path} (${payload.duration}ms, HTTP ${payload.statusCode})`);
+                    window.dispatchEvent(new CustomEvent('roku:ack', { detail: payload }));
+                }
+            });
+
+            relayChannel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('[RokuECP] Connected to Supabase Realtime relay. Pinging for bridge...');
+                    pingBridge();
+                }
+            });
+
+            // Watchdog: detect if bridge goes offline (>25s without heartbeat)
+            setInterval(() => {
+                if (bridgeStatus.online && Date.now() - bridgeStatus.lastHeartbeat > 25000) {
+                    bridgeStatus.online = false;
+                    notifyBridgeListeners();
+                }
+            }, 5000);
+        } catch (err) {
+            console.warn('[RokuECP] Relay init error:', err);
+        }
+    }
+
+    /**
+     * Sends a ping to ask any running bridge daemon to broadcast its presence.
+     */
+    function pingBridge() {
+        if (!relayChannel) return;
+        try {
+            relayChannel.send({
+                type: 'broadcast',
+                event: 'bridge-ping',
+                payload: { timestamp: Date.now() }
+            });
+        } catch (e) {}
+    }
+
+    function notifyBridgeListeners() {
+        bridgeListeners.forEach(fn => {
+            try { fn(getBridgeStatus()); } catch (e) {}
+        });
+    }
+
+    /**
+     * Subscribes to live bridge status updates.
+     * @param {function(object):void} callback 
+     */
+    function onBridgeStatusChange(callback) {
+        if (typeof callback === 'function') {
+            bridgeListeners.push(callback);
+            callback(getBridgeStatus());
+        }
+    }
+
+    /**
+     * Returns current bridge connection status.
+     * @returns {{online: boolean, hostIp: string, hostname: string, version: string, lastHeartbeat: number}}
+     */
+    function getBridgeStatus() {
+        return {
+            online: bridgeStatus.online,
+            hostIp: bridgeStatus.hostIp,
+            hostname: bridgeStatus.hostname,
+            version: bridgeStatus.version,
+            commandsHandled: bridgeStatus.commandsHandled,
+            lastHeartbeat: bridgeStatus.lastHeartbeat
+        };
+    }
+
+    // Auto-init relay
+    if (typeof window !== 'undefined') {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initRelay);
+        } else {
+            setTimeout(initRelay, 100);
+        }
+    }
 
     /**
      * Retrieves configured Roku IP address.
@@ -92,8 +226,31 @@ const RokuECP = (function () {
             };
         }
 
+        const targetIp = getIp();
+        const cmdId = Math.random().toString(36).substring(2, 9);
+        let relayDispatched = false;
+
+        // Primary Vector (Mobile / HTTPS): Relay through local PC bridge over Supabase Realtime WebSocket
+        if (relayChannel) {
+            try {
+                relayChannel.send({
+                    type: 'broadcast',
+                    event: 'roku-cmd',
+                    payload: {
+                        path: path,
+                        ip: targetIp,
+                        id: cmdId,
+                        timestamp: Date.now()
+                    }
+                });
+                relayDispatched = true;
+            } catch (relayErr) {
+                console.warn('[RokuECP] Relay send note:', relayErr);
+            }
+        }
+
+        // Secondary Vector (Direct LAN): Multi-channel direct POST for local unblocked environments
         const url = `${base}${path}`;
-        let dispatched = false;
 
         // Channel 1: Hidden Iframe Form POST
         // In mobile WebKit/Blink on HTTPS, form navigation dispatches the HTTP POST at the socket layer
@@ -124,7 +281,6 @@ const RokuECP = (function () {
             setTimeout(() => {
                 try { form.remove(); } catch (e) {}
             }, 500);
-            dispatched = true;
         } catch (formErr) {
             console.warn('[RokuECP] Form dispatch note:', formErr);
         }
@@ -133,7 +289,6 @@ const RokuECP = (function () {
         try {
             if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
                 navigator.sendBeacon(url, '');
-                dispatched = true;
             }
         } catch (beaconErr) {}
 
@@ -144,14 +299,19 @@ const RokuECP = (function () {
                 mode: 'no-cors',
                 cache: 'no-cache',
                 credentials: 'omit'
-            }).then(() => {
-                dispatched = true;
             }).catch(() => {});
         } catch (fetchErr) {}
 
+        const isBridge = bridgeStatus.online;
+        const msg = isBridge
+            ? `Dispatched via PC Bridge (${bridgeStatus.hostIp || '192.168.50.158'}) to ${getName()} (${targetIp})`
+            : `Command dispatched to ${getName()} (${targetIp}:8060)`;
+
         return {
             success: true,
-            message: `Command dispatched to ${getName()} (${getIp()}:8060).`
+            bridgeActive: isBridge,
+            cmdId,
+            message: msg
         };
     }
 
@@ -258,9 +418,13 @@ const RokuECP = (function () {
         }
 
         const res = await sendKey('Info');
+        const bridgeNote = (res && res.bridgeActive) 
+            ? ` via PC Bridge (${bridgeStatus.hostIp || '192.168.50.158'})` 
+            : '';
         return {
             success: true,
-            message: `Command dispatched to ${getName()} (${getIp()}:8060). Look for on-screen reaction. (If no reaction, set Roku Settings > System > Advanced > Control by mobile apps to "Permissive").`
+            bridgeActive: bridgeStatus.online,
+            message: `Command dispatched${bridgeNote} to ${getName()} (${getIp()}:8060). Look for on-screen reaction. (If no reaction, set Roku Settings > System > Advanced > Control by mobile apps to "Permissive").`
         };
     }
 
@@ -277,7 +441,11 @@ const RokuECP = (function () {
         searchAndLaunch,
         playShowOnRoku,
         resolveProviderChannelId,
-        testConnection
+        testConnection,
+        getBridgeStatus,
+        onBridgeStatusChange,
+        pingBridge,
+        initRelay
     };
 })();
 
