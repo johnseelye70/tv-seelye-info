@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2.4.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=2.4.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2.4.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2.5.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=2.5.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2.5.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=2.4.0">
+    <link rel="stylesheet" href="style.css?v=2.5.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -29,7 +29,7 @@
             <div class="logo-subline">
                 <span class="domain">tv.seelye.info</span>
                 <span class="logo-divider">•</span>
-                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 2.4.0</button>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 2.5.0</button>
             </div>
         </div>
         <div class="auth-section">
@@ -454,7 +454,7 @@
                     <div>
                         <div class="changelog-title-group">
                             <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
-                            <span class="changelog-current-badge">Beta 2.4.0</span>
+                            <span class="changelog-current-badge">Beta 2.5.0</span>
                         </div>
                         <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
                     </div>
@@ -467,8 +467,14 @@
                     <ul class="changelog-timeline-list">
                         <li class="changelog-entry">
                             <div class="changelog-entry-header">
-                                <span class="changelog-version-tag">Beta 2.4.0</span>
+                                <span class="changelog-version-tag">Beta 2.5.0</span>
                                 <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Multi-Device Tombstone Deletion Ledger &amp; Resilient Cross-Device Sync:</strong> Resolved cross-device deletion resurrection bugs where stale mobile browser local storage (iPhone) inadvertently repushed cleared library items back into Supabase cloud storage upon refresh. Engineered a dual-layer deletion tombstone ledger (<code>tv_hub_deleted_items</code> / <code>user_deleted_${userId}</code> in PostgreSQL <code>system_settings</code>) tracking deleted content UUIDs, TMDB IDs, and titles. Enforced strict <strong>Read-Only Data Fetching</strong> push guards so background syncs, tab focus events, and mobile page loads never trigger cloud push side-effects. Integrated real-time WebSocket sync broadcasting across active browser sessions via Supabase Realtime (<code>seelye-sync-relay</code>), immediately removing deleted shows on connected devices without requiring manual page reload.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 2.4.0</span>
                             </div>
                             <p class="changelog-desc"><strong>iOS Safari Gesture Stability &amp; Zero Side-to-Side Swirling:</strong> Eliminated horizontal elasticity and sloppy side-to-side rubber-banding on iOS Safari by locking the viewport scale (<code>maximum-scale=1.0, user-scalable=no, viewport-fit=cover</code>), enforcing strict <code>touch-action: pan-y</code> and <code>overscroll-behavior-x: none</code> on <code>html</code>, <code>body</code>, and main dashboard containers, and establishing boundary containment with <code>overflow-x: hidden</code> on <code>body</code>. Intercepted multi-touch gestures and multi-finger <code>touchmove</code> events in JavaScript to prevent accidental canvas shifting and pinch distortion while preserving fluid, native vertical scrolling, input typing, and horizontal carousel navigation.</p>
                         </li>
@@ -865,9 +871,9 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=2.4.0"></script>
-    <script src="db.js?v=2.4.0"></script>
-    <script src="roku.js?v=2.4.0"></script>
-    <script src="app.js?v=2.4.0"></script>
+    <script src="service_catalog.js?v=2.5.0"></script>
+    <script src="db.js?v=2.5.0"></script>
+    <script src="roku.js?v=2.5.0"></script>
+    <script src="app.js?v=2.5.0"></script>
 </body>
 </html>

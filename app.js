@@ -742,14 +742,43 @@ document.addEventListener('DOMContentLoaded', () => {
         window.addEventListener('resize', updateDeviceMetrics, { passive: true });
         window.addEventListener('orientationchange', updateDeviceMetrics, { passive: true });
 
-        // Auto re-sync when user returns or switches tabs
+        // Auto re-sync when user returns or switches tabs (Read-only data fetch, zero push)
         document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'visible' && currentUser) {
                 try {
-                    await window.db.syncCloudUserData(currentUser.id, currentUser.email);
+                    await window.db.syncCloudUserData(currentUser.id, currentUser.email, false);
                     allContent = await window.db.getContentItems();
                     await loadUserData();
                 } catch (e) {}
+            }
+        });
+
+        // Listen for real-time multi-device library sync events
+        window.db.initSyncRealtime(async (payload) => {
+            if (!payload || !currentUser) return;
+            if (payload.userId && payload.userId !== currentUser.id) return;
+
+            if (payload.event === 'item-deleted') {
+                const pId = String(payload.id);
+                const pUuid = String(payload.uuid || '');
+                const pTmdb = String(payload.tmdb_id || '');
+                allContent = allContent.filter(c => {
+                    const cId = String(c.id);
+                    const cTmdb = String(c.tmdb_id || '');
+                    return cId !== pId && cId !== pUuid && (!pTmdb || cTmdb !== pTmdb);
+                });
+                userWatchlist = userWatchlist.filter(w => {
+                    const wId = String(w.content_item_id);
+                    return wId !== pId && wId !== pUuid && (!pTmdb || wId !== pTmdb);
+                });
+                await fetchRecommendations();
+                renderAllSections();
+                showToast(`Library updated: "${payload.title || 'Show'}" removed on another device.`, 'info');
+            } else if (payload.event === 'item-added' || payload.event === 'watch-updated') {
+                await window.db.syncCloudUserData(currentUser.id, currentUser.email, false);
+                allContent = await window.db.getContentItems();
+                await loadUserData();
+                showToast('Library updated from another device.', 'info');
             }
         });
 
@@ -763,7 +792,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateAuthUI();
             if (currentUser && event === 'SIGNED_IN') {
                 try {
-                    await window.db.syncCloudUserData(currentUser.id, currentUser.email);
+                    await window.db.syncCloudUserData(currentUser.id, currentUser.email, false);
                     allContent = await window.db.getContentItems();
                     await healLibraryServices();
                     await loadUserData();
@@ -778,7 +807,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUser = await window.db.getCurrentUser();
         updateAuthUI();
         if (currentUser) {
-            await window.db.syncCloudUserData(currentUser.id, currentUser.email);
+            await window.db.syncCloudUserData(currentUser.id, currentUser.email, false);
         }
         
         allServices = await window.db.getStreamingServices();
@@ -3536,8 +3565,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (error) {
                     showToast("Error removing show: " + error.message, 'error');
                 } else {
-                    allContent = allContent.filter(c => String(c.id) !== String(itemId));
-                    userWatchlist = userWatchlist.filter(w => String(w.content_item_id) !== String(itemId));
+                    const uuid = window.db?.toDeterministicUuid ? window.db.toDeterministicUuid(itemId) : itemId;
+                    allContent = allContent.filter(c => {
+                        const cId = String(c.id);
+                        const cTmdb = String(c.tmdb_id || '');
+                        return cId !== String(itemId) && cId !== String(uuid) && cTmdb !== String(itemId);
+                    });
+                    userWatchlist = userWatchlist.filter(w => {
+                        const wId = String(w.content_item_id);
+                        return wId !== String(itemId) && wId !== String(uuid);
+                    });
                     await fetchRecommendations();
                     renderAllSections();
                     showToast(`Removed "${title}" from your library.`, 'info');
