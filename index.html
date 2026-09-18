@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.5.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.5.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.5.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.6.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.6.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.6.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=1.5.0">
+    <link rel="stylesheet" href="style.css?v=1.6.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -29,7 +29,7 @@
             <div class="logo-subline">
                 <span class="domain">tv.seelye.info</span>
                 <span class="logo-divider">•</span>
-                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.5.0</button>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.6.0</button>
             </div>
         </div>
         <div class="auth-section">
@@ -247,7 +247,7 @@
                     <div>
                         <div class="changelog-title-group">
                             <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
-                            <span class="changelog-current-badge">Beta 1.5.0</span>
+                            <span class="changelog-current-badge">Beta 1.6.0</span>
                         </div>
                         <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
                     </div>
@@ -260,8 +260,14 @@
                     <ul class="changelog-timeline-list">
                         <li class="changelog-entry">
                             <div class="changelog-entry-header">
-                                <span class="changelog-version-tag">Beta 1.5.0</span>
+                                <span class="changelog-version-tag">Beta 1.6.0</span>
                                 <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Inline Show &amp; Episode Video Viewer:</strong> Integrated an in-place, responsive inline video theater into every episode card across the Show Tracker, directly patterned after <code>games.seelye.info</code>. Users can expand episode trailers, previews, and official clips inline without modal popups or layout shifts. Features pulsing status beacons, direct deep-link launchers to the show's assigned streaming platform (Disney+, Netflix, Hulu, Peacock, Prime Video, Apple TV+), responsive 16:9 widescreen embedding with strict-origin referrer policies for iOS Safari sandboxing compliance, and a fail-safe fallback bar ensuring uninterrupted viewing across all devices.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 1.5.0</span>
                             </div>
                             <p class="changelog-desc"><strong>Season &amp; Episode Watch Tracking, Checklists &amp; Series Archive:</strong> Added comprehensive season and episode tracking rendered 100% inline directly in the dashboard stream without modal overlays. Provides interactive episode check-off cards with episode stills, air dates, runtimes, and synopses; one-click "Mark Season Complete" actions; and a prominent "Mark Series Complete &amp; Move to Archive" workflow. Integrated an Archive status filter into My Library (both desktop pills and mobile selection) to cleanly separate finished series from active watches while preserving archived shows as high-affinity positive seeds in the Smart Recommendation Engine. Features multi-device union-merging for watched episode sets.</p>
                         </li>

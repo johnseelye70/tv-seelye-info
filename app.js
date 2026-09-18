@@ -55,6 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentTrackerShow = null;
     let currentTrackerSeason = 1;
+    let activeVideoEpisodeKey = null;
+    const episodeVideosCache = {};
 
     const authBtn = document.getElementById('auth-btn');
     const authStatusBadge = document.getElementById('auth-status-badge');
@@ -833,6 +835,9 @@ document.addEventListener('DOMContentLoaded', () => {
             viewShowTracker.classList.toggle('active', viewName === 'show-tracker');
             viewShowTracker.style.display = viewName === 'show-tracker' ? 'block' : 'none';
         }
+        if (viewName !== 'show-tracker') {
+            activeVideoEpisodeKey = null;
+        }
 
         if (viewName === 'library') {
             renderContinueWatching();
@@ -916,7 +921,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 6000);
-                const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${key}&append_to_response=external_ids,credits`, { signal: controller.signal });
+                const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${key}&append_to_response=external_ids,credits,videos`, { signal: controller.signal });
                 clearTimeout(timeoutId);
                 if (res.ok) {
                     details = await res.json();
@@ -1000,6 +1005,115 @@ document.addEventListener('DOMContentLoaded', () => {
 
         seasonEpisodesCache[cacheKey] = episodes;
         return episodes;
+    }
+
+    function getProviderWatchUrl(showItem, seasonNumber, episodeNumber) {
+        const title = showItem?.title || showItem?.name || 'Show';
+        const cleanTitle = encodeURIComponent(title);
+        const epSearchTerm = encodeURIComponent(`${title} Season ${seasonNumber} Episode ${episodeNumber}`);
+        const serviceKey = detectShowServiceSync(showItem) || (showItem.streaming_services?.name || showItem.mock_service || '').toLowerCase();
+
+        if (serviceKey.includes('disney')) {
+            return `https://www.disneyplus.com/search?q=${cleanTitle}`;
+        }
+        if (serviceKey.includes('netflix')) {
+            return `https://www.netflix.com/search?q=${cleanTitle}`;
+        }
+        if (serviceKey.includes('peacock')) {
+            return `https://www.peacocktv.com/search?q=${cleanTitle}`;
+        }
+        if (serviceKey.includes('hulu')) {
+            return `https://www.hulu.com/search?q=${cleanTitle}`;
+        }
+        if (serviceKey.includes('prime') || serviceKey.includes('amazon')) {
+            return `https://www.amazon.com/s?k=${cleanTitle}&i=instant-video`;
+        }
+        if (serviceKey.includes('apple') || serviceKey.includes('appletv')) {
+            return `https://tv.apple.com/search?term=${cleanTitle}`;
+        }
+        if (serviceKey.includes('youtube')) {
+            return `https://www.youtube.com/results?search_query=${epSearchTerm}`;
+        }
+        return `https://www.google.com/search?q=${encodeURIComponent(`watch ${title} season ${seasonNumber} episode ${episodeNumber}`)}`;
+    }
+
+    async function fetchEpisodeVideoData(showItem, seasonNumber, episodeNumber) {
+        const showId = String(showItem.id);
+        const tmdbId = String(showItem.tmdb_id || showItem.id || '');
+        const cacheKey = `${showId}_s${seasonNumber}_e${episodeNumber}`;
+        if (episodeVideosCache[cacheKey]) return episodeVideosCache[cacheKey];
+
+        const key = await getTmdbKey();
+        let videoData = null;
+
+        if (key && tmdbId && !tmdbId.startsWith('custom_')) {
+            // 1. Try TMDB Episode Videos endpoint
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000);
+                const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/season/${seasonNumber}/episode/${episodeNumber}/videos?api_key=${key}`, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data.results) && data.results.length > 0) {
+                        const ytVideo = data.results.find(v => v.site === 'YouTube' && (v.type === 'Clip' || v.type === 'Teaser' || v.type === 'Trailer' || v.type === 'Featurette')) 
+                            || data.results.find(v => v.site === 'YouTube');
+                        if (ytVideo && ytVideo.key) {
+                            videoData = {
+                                key: ytVideo.key,
+                                title: ytVideo.name || `${showItem.title} S${seasonNumber}E${episodeNumber}`,
+                                type: ytVideo.type || 'Official Clip',
+                                site: 'YouTube',
+                                embedUrl: `https://www.youtube-nocookie.com/embed/${ytVideo.key}?autoplay=1&rel=0`,
+                                directUrl: `https://www.youtube.com/watch?v=${ytVideo.key}`
+                            };
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn("fetchEpisodeVideoData episode video error:", err);
+            }
+
+            // 2. Fallback to Show-level videos if episode has no specific video
+            if (!videoData) {
+                try {
+                    const { details } = await fetchShowSeasonsData(showItem);
+                    const showVideos = details?.videos?.results;
+                    if (Array.isArray(showVideos) && showVideos.length > 0) {
+                        const ytVideo = showVideos.find(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser')) 
+                            || showVideos.find(v => v.site === 'YouTube');
+                        if (ytVideo && ytVideo.key) {
+                            videoData = {
+                                key: ytVideo.key,
+                                title: ytVideo.name || `${showItem.title} Preview`,
+                                type: ytVideo.type || 'Official Trailer',
+                                site: 'YouTube',
+                                embedUrl: `https://www.youtube-nocookie.com/embed/${ytVideo.key}?autoplay=1&rel=0`,
+                                directUrl: `https://www.youtube.com/watch?v=${ytVideo.key}`
+                            };
+                        }
+                    }
+                } catch (err) {
+                    console.warn("fetchEpisodeVideoData show-level fallback error:", err);
+                }
+            }
+        }
+
+        // 3. Fallback to privacy-friendly YouTube search embed
+        if (!videoData) {
+            const query = `${showItem.title} Season ${seasonNumber} Episode ${episodeNumber}`;
+            videoData = {
+                key: null,
+                title: `${showItem.title} - S${seasonNumber}E${episodeNumber}`,
+                type: 'Episode Stream / Clip',
+                site: 'YouTube',
+                embedUrl: `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(query)}&autoplay=1`,
+                directUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`
+            };
+        }
+
+        episodeVideosCache[cacheKey] = videoData;
+        return videoData;
     }
 
     async function toggleEpisodeWatched(showItem, seasonNumber, episodeNumber, currentSeasonEpisodes, allSeasons) {
@@ -1221,6 +1335,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function renderShowTracker(showItem, requestedSeason = null) {
         if (!showTrackerContent) return;
+        if (!currentTrackerShow || String(currentTrackerShow.id) !== String(showItem.id)) {
+            activeVideoEpisodeKey = null;
+        }
         currentTrackerShow = showItem;
 
         if (trackerCrumbTitle) {
@@ -1248,6 +1365,12 @@ document.addEventListener('DOMContentLoaded', () => {
         currentTrackerSeason = activeSeasonNum;
 
         const currentEpisodes = await fetchSeasonEpisodesData(showItem, activeSeasonNum);
+
+        let activeVideoData = null;
+        if (activeVideoEpisodeKey && activeVideoEpisodeKey.startsWith(`s${activeSeasonNum}_e`)) {
+            const activeEpNum = parseInt(activeVideoEpisodeKey.split('_e')[1], 10);
+            activeVideoData = await fetchEpisodeVideoData(showItem, activeSeasonNum, activeEpNum);
+        }
 
         const watchData = getShowWatchData(showItem.id);
         const watchedMap = watchData.episodes_watched || {};
@@ -1366,39 +1489,102 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${currentEpisodes.map(ep => {
                     const epKey = `s${activeSeasonNum}_e${ep.episode_number}`;
                     const isWatched = Boolean(watchedMap[epKey]);
+                    const isPlaying = activeVideoEpisodeKey === epKey;
                     const still = ep.still_path || posterImg;
                     const runtimeStr = ep.runtime ? `${ep.runtime} min` : '';
                     const airDateStr = ep.air_date ? new Date(ep.air_date + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+                    const providerWatchUrl = getProviderWatchUrl(showItem, activeSeasonNum, ep.episode_number);
+
+                    let inlineTheaterHtml = '';
+                    if (isPlaying && activeVideoData) {
+                        inlineTheaterHtml = `
+                            <div class="episode-inline-theater animate-fadeIn" id="theater-${epKey}">
+                                <div class="theater-header">
+                                    <div class="theater-status">
+                                        <span class="theater-beacon"></span>
+                                        <span class="theater-badge">${serviceName}</span>
+                                        <span class="theater-title" title="${activeVideoData.title.replace(/"/g, '&quot;')}">${activeVideoData.title}</span>
+                                        <span class="theater-type-pill">${activeVideoData.type}</span>
+                                    </div>
+                                    <div class="theater-actions">
+                                        <a href="${providerWatchUrl}" target="_blank" rel="noopener noreferrer" class="theater-ext-btn provider-btn" title="Watch full episode on ${serviceName}">
+                                            <span>📺 Watch on ${serviceName}</span> ↗
+                                        </a>
+                                        <a href="${activeVideoData.directUrl}" target="_blank" rel="noopener noreferrer" class="theater-ext-btn youtube-btn" title="Open video on YouTube">
+                                            <span>YouTube</span> ↗
+                                        </a>
+                                        <button type="button" class="theater-close-btn" data-season="${activeSeasonNum}" data-episode="${ep.episode_number}" title="Close Video Player" aria-label="Close Player">✕</button>
+                                    </div>
+                                </div>
+
+                                <div class="theater-iframe-container">
+                                    <iframe 
+                                        src="${activeVideoData.embedUrl}" 
+                                        title="${showItem.title.replace(/"/g, '&quot;')} - S${activeSeasonNum}E${ep.episode_number} ${ep.name.replace(/"/g, '&quot;')}" 
+                                        class="theater-iframe" 
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                        referrerpolicy="strict-origin-when-cross-origin" 
+                                        allowfullscreen>
+                                    </iframe>
+                                </div>
+
+                                <div class="theater-fallback-bar">
+                                    <div class="theater-fallback-info">
+                                        <span class="theater-fallback-icon">💡</span>
+                                        <span>Trouble playing inline? (Some mobile browsers block third-party embeds)</span>
+                                    </div>
+                                    <div class="theater-fallback-actions">
+                                        <a href="${providerWatchUrl}" target="_blank" rel="noopener noreferrer" class="theater-fallback-link provider">
+                                            Watch directly on ${serviceName} ↗
+                                        </a>
+                                        <span class="theater-fallback-divider">•</span>
+                                        <a href="${activeVideoData.directUrl}" target="_blank" rel="noopener noreferrer" class="theater-fallback-link youtube">
+                                            Watch on YouTube ↗
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
 
                     return `
-                        <div class="episode-card ${isWatched ? 'is-watched' : ''}" id="ep-card-${activeSeasonNum}-${ep.episode_number}">
-                            <div class="episode-still-col">
-                                <div class="episode-still-img" style="background-image: url('${still}')">
-                                    ${runtimeStr ? `<span class="episode-runtime-pill">${runtimeStr}</span>` : ''}
-                                    ${isWatched ? '<span class="episode-watched-badge">✓ Watched</span>' : ''}
+                        <div class="episode-card ${isWatched ? 'is-watched' : ''} ${isPlaying ? 'is-playing' : ''}" id="ep-card-${activeSeasonNum}-${ep.episode_number}">
+                            <div class="episode-card-main">
+                                <div class="episode-still-col">
+                                    <div class="episode-still-img" style="background-image: url('${still}')">
+                                        ${runtimeStr ? `<span class="episode-runtime-pill">${runtimeStr}</span>` : ''}
+                                        ${isWatched ? '<span class="episode-watched-badge">✓ Watched</span>' : ''}
+                                    </div>
+                                </div>
+                                <div class="episode-info-col">
+                                    <div class="episode-header-line">
+                                        <h4 class="episode-title">
+                                            <span class="ep-num-pill">E${ep.episode_number}</span>
+                                            ${ep.name}
+                                        </h4>
+                                        ${ep.vote_average ? `<span class="ep-rating-pill">★ ${ep.vote_average}</span>` : ''}
+                                    </div>
+                                    <div class="episode-sub-meta">
+                                        ${airDateStr ? `<span>Aired: ${airDateStr}</span>` : ''}
+                                    </div>
+                                    <p class="episode-overview">${ep.overview}</p>
+                                </div>
+                                <div class="episode-action-col">
+                                    <button type="button" class="btn-watch-episode ${isPlaying ? 'is-playing' : ''}" 
+                                        data-season="${activeSeasonNum}" 
+                                        data-episode="${ep.episode_number}"
+                                        title="${isPlaying ? 'Close inline video player' : 'Watch episode preview & clips inline'}">
+                                        ${isPlaying ? '<span>✕</span> Close Player' : '<span>▶</span> Watch Episode'}
+                                    </button>
+                                    <button type="button" class="btn-episode-toggle ${isWatched ? 'is-watched' : ''}" 
+                                        data-season="${activeSeasonNum}" 
+                                        data-episode="${ep.episode_number}"
+                                        aria-label="Toggle watched status for Episode ${ep.episode_number}">
+                                        ${isWatched ? '<span>✓</span> Watched' : '<span>○</span> Mark Watched'}
+                                    </button>
                                 </div>
                             </div>
-                            <div class="episode-info-col">
-                                <div class="episode-header-line">
-                                    <h4 class="episode-title">
-                                        <span class="ep-num-pill">E${ep.episode_number}</span>
-                                        ${ep.name}
-                                    </h4>
-                                    ${ep.vote_average ? `<span class="ep-rating-pill">★ ${ep.vote_average}</span>` : ''}
-                                </div>
-                                <div class="episode-sub-meta">
-                                    ${airDateStr ? `<span>Aired: ${airDateStr}</span>` : ''}
-                                </div>
-                                <p class="episode-overview">${ep.overview}</p>
-                            </div>
-                            <div class="episode-action-col">
-                                <button type="button" class="btn-episode-toggle ${isWatched ? 'is-watched' : ''}" 
-                                    data-season="${activeSeasonNum}" 
-                                    data-episode="${ep.episode_number}"
-                                    aria-label="Toggle watched status for Episode ${ep.episode_number}">
-                                    ${isWatched ? '<span>✓</span> Watched' : '<span>○</span> Mark Watched'}
-                                </button>
-                            </div>
+                            ${inlineTheaterHtml}
                         </div>
                     `;
                 }).join('')}
@@ -1450,6 +1636,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderShowTracker(showItem, activeSeasonNum);
             });
         }
+
+        const watchEpisodeBtns = showTrackerContent.querySelectorAll('.btn-watch-episode');
+        watchEpisodeBtns.forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const sNum = parseInt(btn.dataset.season, 10);
+                const epNum = parseInt(btn.dataset.episode, 10);
+                const epKey = `s${sNum}_e${epNum}`;
+
+                if (activeVideoEpisodeKey === epKey) {
+                    activeVideoEpisodeKey = null;
+                    renderShowTracker(showItem, sNum);
+                    return;
+                }
+
+                btn.disabled = true;
+                btn.innerHTML = '<span>⏳</span> Loading...';
+                activeVideoEpisodeKey = epKey;
+                await fetchEpisodeVideoData(showItem, sNum, epNum);
+                renderShowTracker(showItem, sNum);
+            });
+        });
+
+        const theaterCloseBtns = showTrackerContent.querySelectorAll('.theater-close-btn');
+        theaterCloseBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                activeVideoEpisodeKey = null;
+                renderShowTracker(showItem, activeSeasonNum);
+            });
+        });
 
         const epToggles = showTrackerContent.querySelectorAll('.btn-episode-toggle');
         epToggles.forEach(btn => {
@@ -3160,10 +3375,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Event Listeners ---
     function setupEventListeners() {
         if (trackerBackBtn) {
-            trackerBackBtn.addEventListener('click', () => switchView('library'));
+            trackerBackBtn.addEventListener('click', () => {
+                activeVideoEpisodeKey = null;
+                switchView('library');
+            });
         }
         if (crumbLibraryLink) {
-            crumbLibraryLink.addEventListener('click', () => switchView('library'));
+            crumbLibraryLink.addEventListener('click', () => {
+                activeVideoEpisodeKey = null;
+                switchView('library');
+            });
         }
 
         // Global Grid Change Listener for Status Dropdown
