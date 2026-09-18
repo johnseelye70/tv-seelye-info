@@ -323,11 +323,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function extractServiceFromTmdbDetails(details) {
         if (!details) return null;
 
-        // 1. Check US flatrate watch providers
-        const usFlatrate = details['watch/providers']?.results?.US?.flatrate 
-            || details.watch_providers?.results?.US?.flatrate;
-        if (Array.isArray(usFlatrate) && usFlatrate.length > 0) {
-            for (const prov of usFlatrate) {
+        // 1. Check US watch providers (flatrate, ads, free)
+        const usWatch = details['watch/providers']?.results?.US || details.watch_providers?.results?.US;
+        const usProviders = [
+            ...(usWatch?.flatrate || []),
+            ...(usWatch?.ads || []),
+            ...(usWatch?.free || [])
+        ];
+        if (usProviders.length > 0) {
+            for (const prov of usProviders) {
                 const pName = (prov.provider_name || '').toLowerCase();
                 if (pName.includes('disney')) return 'disney';
                 if (pName.includes('netflix')) return 'netflix';
@@ -446,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let detectedKey = detectShowServiceSync(item);
                 if (!detectedKey && cloudKey && item.tmdb_id && !String(item.tmdb_id).startsWith('custom_')) {
                     try {
-                        const res = await fetch(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${cloudKey}&append_to_response=watch/providers`);
+                        const res = await fetch(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${cloudKey}&language=en-US&append_to_response=watch/providers`);
                         if (res.ok) {
                             const det = await res.json();
                             detectedKey = extractServiceFromTmdbDetails(det);
@@ -921,7 +925,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 6000);
-                const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${key}&append_to_response=external_ids,credits,videos`, { signal: controller.signal });
+                const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${key}&language=en-US&append_to_response=external_ids,credits,videos`, { signal: controller.signal });
                 clearTimeout(timeoutId);
                 if (res.ok) {
                     details = await res.json();
@@ -965,7 +969,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 6000);
-                const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/season/${seasonNumber}?api_key=${key}`, { signal: controller.signal });
+                const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/season/${seasonNumber}?api_key=${key}&language=en-US`, { signal: controller.signal });
                 clearTimeout(timeoutId);
                 if (res.ok) {
                     const data = await res.json();
@@ -1007,6 +1011,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return episodes;
     }
 
+    function getTmdbUsWatchUrl(showItem) {
+        const tmdbId = String(showItem?.tmdb_id || showItem?.id || '');
+        if (tmdbId && !tmdbId.startsWith('custom_')) {
+            return `https://www.themoviedb.org/tv/${tmdbId}/watch?locale=US`;
+        }
+        const title = showItem?.title || showItem?.name || '';
+        return `https://www.google.com/search?q=${encodeURIComponent(`watch ${title} united states streaming`)}`;
+    }
+
     function getProviderWatchUrl(showItem, seasonNumber, episodeNumber) {
         const title = showItem?.title || showItem?.name || 'Show';
         const cleanTitle = encodeURIComponent(title);
@@ -1014,13 +1027,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const serviceKey = detectShowServiceSync(showItem) || (showItem.streaming_services?.name || showItem.mock_service || '').toLowerCase();
 
         if (serviceKey.includes('disney')) {
-            return `https://www.disneyplus.com/search?q=${cleanTitle}`;
+            return `https://www.disneyplus.com/en-us/home`;
         }
         if (serviceKey.includes('netflix')) {
             return `https://www.netflix.com/search?q=${cleanTitle}`;
         }
         if (serviceKey.includes('peacock')) {
-            return `https://www.peacocktv.com/search?q=${cleanTitle}`;
+            return `https://www.peacocktv.com/watch/home`;
         }
         if (serviceKey.includes('hulu')) {
             return `https://www.hulu.com/search?q=${cleanTitle}`;
@@ -1029,12 +1042,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return `https://www.amazon.com/s?k=${cleanTitle}&i=instant-video`;
         }
         if (serviceKey.includes('apple') || serviceKey.includes('appletv')) {
-            return `https://tv.apple.com/search?term=${cleanTitle}`;
+            return `https://tv.apple.com/us/search?term=${cleanTitle}`;
         }
         if (serviceKey.includes('youtube')) {
-            return `https://www.youtube.com/results?search_query=${epSearchTerm}`;
+            return `https://tv.youtube.com/search/${cleanTitle}`;
         }
-        return `https://www.google.com/search?q=${encodeURIComponent(`watch ${title} season ${seasonNumber} episode ${episodeNumber}`)}`;
+        return `https://www.google.com/search?q=${encodeURIComponent(`watch ${title} season ${seasonNumber} episode ${episodeNumber} streaming US`)}`;
     }
 
     async function fetchEpisodeVideoData(showItem, seasonNumber, episodeNumber) {
@@ -1051,7 +1064,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 6000);
-                const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/season/${seasonNumber}/episode/${episodeNumber}/videos?api_key=${key}`, { signal: controller.signal });
+                const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/season/${seasonNumber}/episode/${episodeNumber}/videos?api_key=${key}&language=en-US`, { signal: controller.signal });
                 clearTimeout(timeoutId);
                 if (res.ok) {
                     const data = await res.json();
@@ -1494,6 +1507,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const runtimeStr = ep.runtime ? `${ep.runtime} min` : '';
                     const airDateStr = ep.air_date ? new Date(ep.air_date + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
                     const providerWatchUrl = getProviderWatchUrl(showItem, activeSeasonNum, ep.episode_number);
+                    const usWatchUrl = getTmdbUsWatchUrl(showItem);
 
                     let inlineTheaterHtml = '';
                     if (isPlaying && activeVideoData) {
@@ -1502,13 +1516,16 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <div class="theater-header">
                                     <div class="theater-status">
                                         <span class="theater-beacon"></span>
-                                        <span class="theater-badge">${serviceName}</span>
+                                        <span class="theater-badge">${serviceName} (US)</span>
                                         <span class="theater-title" title="${activeVideoData.title.replace(/"/g, '&quot;')}">${activeVideoData.title}</span>
                                         <span class="theater-type-pill">${activeVideoData.type}</span>
                                     </div>
                                     <div class="theater-actions">
-                                        <a href="${providerWatchUrl}" target="_blank" rel="noopener noreferrer" class="theater-ext-btn provider-btn" title="Watch full episode on ${serviceName}">
-                                            <span>📺 Watch on ${serviceName}</span> ↗
+                                        <a href="${providerWatchUrl}" target="_blank" rel="noopener noreferrer" class="theater-ext-btn provider-btn" title="Watch on ${serviceName} (US)">
+                                            <span>📺 ${serviceName} (US)</span> ↗
+                                        </a>
+                                        <a href="${usWatchUrl}" target="_blank" rel="noopener noreferrer" class="theater-ext-btn provider-btn" style="background: rgba(0, 195, 255, 0.08); border-color: rgba(0, 195, 255, 0.35);" title="View all United States streaming availability on JustWatch / TMDB">
+                                            <span>🇺🇸 US Streams</span> ↗
                                         </a>
                                         <a href="${activeVideoData.directUrl}" target="_blank" rel="noopener noreferrer" class="theater-ext-btn youtube-btn" title="Open video on YouTube">
                                             <span>YouTube</span> ↗
@@ -1535,7 +1552,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                     </div>
                                     <div class="theater-fallback-actions">
                                         <a href="${providerWatchUrl}" target="_blank" rel="noopener noreferrer" class="theater-fallback-link provider">
-                                            Watch directly on ${serviceName} ↗
+                                            Open ${serviceName} (US) ↗
+                                        </a>
+                                        <span class="theater-fallback-divider">•</span>
+                                        <a href="${usWatchUrl}" target="_blank" rel="noopener noreferrer" class="theater-fallback-link" style="color: #00c3ff;">
+                                            All US Streams ↗
                                         </a>
                                         <span class="theater-fallback-divider">•</span>
                                         <a href="${activeVideoData.directUrl}" target="_blank" rel="noopener noreferrer" class="theater-fallback-link youtube">
@@ -2037,12 +2058,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (key && tmdbId && !tmdbId.startsWith('custom_')) {
             try {
-                let res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${key}&append_to_response=external_ids,credits,content_ratings`);
+                let res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${key}&language=en-US&append_to_response=external_ids,credits,content_ratings`);
                 if (res.ok) {
                     details = await res.json();
                     imdbId = details.external_ids?.imdb_id || null;
                 } else {
-                    res = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${key}&append_to_response=external_ids,credits,release_dates`);
+                    res = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${key}&language=en-US&append_to_response=external_ids,credits,release_dates`);
                     if (res.ok) {
                         details = await res.json();
                         imdbId = details.external_ids?.imdb_id || null;
@@ -2315,7 +2336,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const cloudKey = await window.db.getSystemSetting('tmdb_api_key') || localStorage.getItem('tmdb_api_key');
         if (cloudKey && sMeta.networkId && !serviceCache[service + '_live']) {
             try {
-                const res = await fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${cloudKey}&with_networks=${sMeta.networkId}&sort_by=popularity.desc&page=1`);
+                const res = await fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${cloudKey}&with_networks=${sMeta.networkId}&watch_region=US&with_watch_monetization_types=flatrate|free|ads&language=en-US&sort_by=popularity.desc&page=1`);
                 if (res.ok) {
                     const data = await res.json();
                     if (data.results && data.results.length > 0) {
@@ -3971,7 +3992,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tmdbSearchBtn.textContent = 'Searching...';
             tmdbSearchBtn.disabled = true;
             try {
-                const res = await fetch(`https://api.themoviedb.org/3/search/tv?api_key=${key}&query=${encodeURIComponent(query)}`);
+                const res = await fetch(`https://api.themoviedb.org/3/search/tv?api_key=${key}&query=${encodeURIComponent(query)}&region=US&language=en-US&include_adult=false`);
                 if (!res.ok) {
                     showToast("TMDB search failed. Please verify your API Key in Settings.", 'error');
                 } else {
@@ -4127,7 +4148,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!detectedKey) {
                 const cloudKey = localStorage.getItem('tmdb_api_key');
                 if (cloudKey && !tmdbId.startsWith('custom_')) {
-                    fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${cloudKey}&append_to_response=watch/providers`)
+                    fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${cloudKey}&language=en-US&append_to_response=watch/providers`)
                         .then(r => r.ok ? r.json() : null)
                         .then(det => {
                             if (det) {
@@ -4166,7 +4187,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const key = await window.db.getSystemSetting('tmdb_api_key') || localStorage.getItem('tmdb_api_key');
                     if (key && tmdbId && !tmdbId.startsWith('custom_')) {
                         try {
-                            const detRes = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${key}&append_to_response=watch/providers`);
+                            const detRes = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${key}&language=en-US&append_to_response=watch/providers`);
                             if (detRes.ok) {
                                 const det = await detRes.json();
                                 serviceId = extractServiceFromTmdbDetails(det) || '';
