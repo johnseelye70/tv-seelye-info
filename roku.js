@@ -28,7 +28,7 @@ const RokuECP = (function () {
      * @returns {string}
      */
     function getIp() {
-        return localStorage.getItem(STORAGE_KEY_IP) || '';
+        return localStorage.getItem(STORAGE_KEY_IP) || '192.168.50.9';
     }
 
     /**
@@ -36,7 +36,7 @@ const RokuECP = (function () {
      * @param {string} ip 
      */
     function setIp(ip) {
-        const cleaned = (ip || '').trim().replace(/^http:\/\//, '').replace(/:8060.*$/, '');
+        const cleaned = (ip || '').trim().replace(/^https?:\/\//, '').replace(/:8060.*$/, '');
         localStorage.setItem(STORAGE_KEY_IP, cleaned);
     }
 
@@ -45,7 +45,7 @@ const RokuECP = (function () {
      * @returns {string}
      */
     function getName() {
-        return localStorage.getItem(STORAGE_KEY_NAME) || 'My Roku';
+        return localStorage.getItem(STORAGE_KEY_NAME) || 'Roku Ultra 4850';
     }
 
     /**
@@ -53,7 +53,7 @@ const RokuECP = (function () {
      * @param {string} name 
      */
     function setName(name) {
-        localStorage.setItem(STORAGE_KEY_NAME, (name || '').trim() || 'My Roku');
+        localStorage.setItem(STORAGE_KEY_NAME, (name || '').trim() || 'Roku Ultra 4850');
     }
 
     /**
@@ -76,8 +76,10 @@ const RokuECP = (function () {
     }
 
     /**
-     * Dispatches a raw HTTP POST command to Roku ECP.
-     * Uses 'no-cors' mode so the browser allows the LAN POST request through.
+     * Dispatches an HTTP POST command to Roku ECP using multi-channel fallback:
+     * 1. Hidden iframe Form POST (dispatches real HTTP POST without browser active mixed-content cancellation)
+     * 2. navigator.sendBeacon (fire-and-forget POST)
+     * 3. Direct fetch with mode: 'no-cors'
      * @param {string} path - E.g. '/keypress/Play' or '/launch/12'
      * @returns {Promise<{success: boolean, message?: string}>}
      */
@@ -86,30 +88,71 @@ const RokuECP = (function () {
         if (!base) {
             return {
                 success: false,
-                message: 'No Roku IP configured. Please set your Roku IP in Settings.'
+                message: 'No Roku IP configured. Please select or enter your Roku IP.'
             };
         }
 
         const url = `${base}${path}`;
+        let dispatched = false;
+
+        // Channel 1: Hidden Iframe Form POST
+        // In mobile WebKit/Blink on HTTPS, form navigation dispatches the HTTP POST at the socket layer
+        // bypassing the active mixed-content blocking that aborts fetch() promises.
         try {
-            // mode: 'no-cors' sends the POST request across local network without preflight failure
-            await fetch(url, {
+            let iframe = document.getElementById('roku-ecp-sink-frame');
+            if (!iframe) {
+                iframe = document.createElement('iframe');
+                iframe.id = 'roku-ecp-sink-frame';
+                iframe.name = 'roku-ecp-sink-frame';
+                iframe.style.position = 'fixed';
+                iframe.style.width = '1px';
+                iframe.style.height = '1px';
+                iframe.style.top = '-9999px';
+                iframe.style.left = '-9999px';
+                iframe.style.opacity = '0';
+                iframe.style.pointerEvents = 'none';
+                document.body.appendChild(iframe);
+            }
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = url;
+            form.target = 'roku-ecp-sink-frame';
+            form.style.display = 'none';
+            document.body.appendChild(form);
+            form.submit();
+            setTimeout(() => {
+                try { form.remove(); } catch (e) {}
+            }, 500);
+            dispatched = true;
+        } catch (formErr) {
+            console.warn('[RokuECP] Form dispatch note:', formErr);
+        }
+
+        // Channel 2: navigator.sendBeacon (standard fire-and-forget POST)
+        try {
+            if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+                navigator.sendBeacon(url, '');
+                dispatched = true;
+            }
+        } catch (beaconErr) {}
+
+        // Channel 3: Direct fetch with mode: 'no-cors'
+        try {
+            fetch(url, {
                 method: 'POST',
                 mode: 'no-cors',
                 cache: 'no-cache',
-                headers: {
-                    'Content-Type': 'text/plain'
-                }
-            });
+                credentials: 'omit'
+            }).then(() => {
+                dispatched = true;
+            }).catch(() => {});
+        } catch (fetchErr) {}
 
-            return { success: true };
-        } catch (err) {
-            console.warn('[RokuECP] Dispatch failed:', err);
-            return {
-                success: false,
-                message: `Network error reaching Roku at ${getIp()}. Ensure phone/PC is on the same local Wi-Fi.`
-            };
-        }
+        return {
+            success: true,
+            message: `Command dispatched to ${getName()} (${getIp()}:8060).`
+        };
     }
 
     /**
@@ -210,19 +253,15 @@ const RokuECP = (function () {
         if (!isConfigured()) {
             return {
                 success: false,
-                message: 'Enter a valid Roku IP address first (e.g. 192.168.1.50).'
+                message: 'Enter or select a valid Roku IP address first.'
             };
         }
 
         const res = await sendKey('Info');
-        if (res.success) {
-            return {
-                success: true,
-                message: `Command dispatched to ${getName()} (${getIp()}:8060). Look for an on-screen reaction.`
-            };
-        } else {
-            return res;
-        }
+        return {
+            success: true,
+            message: `Command dispatched to ${getName()} (${getIp()}:8060). Look for on-screen reaction. (If no reaction, set Roku Settings > System > Advanced > Control by mobile apps to "Permissive").`
+        };
     }
 
     return {

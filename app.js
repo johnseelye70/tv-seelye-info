@@ -4280,6 +4280,33 @@ document.addEventListener('DOMContentLoaded', () => {
             remoteCfgCloseBtn.addEventListener('click', closeRemoteInlineConfig);
         }
 
+        // Quick Preset Device Buttons
+        const presetBtns = document.querySelectorAll('.roku-preset-btn');
+        presetBtns.forEach(pBtn => {
+            pBtn.addEventListener('click', () => {
+                const ip = pBtn.dataset.ip;
+                const name = pBtn.dataset.name;
+                if (remoteCfgIpAddress) remoteCfgIpAddress.value = ip;
+                if (remoteCfgDeviceName) remoteCfgDeviceName.value = name;
+                if (window.RokuECP) {
+                    window.RokuECP.setIp(ip);
+                    window.RokuECP.setName(name);
+                    showToast(`Selected ${name} (${ip})`, 'success');
+                    if (typeof updateRokuRemoteHeaderDisplay === 'function') {
+                        updateRokuRemoteHeaderDisplay();
+                    }
+                    const adminRokuIp = document.getElementById('roku-ip-address');
+                    const adminRokuName = document.getElementById('roku-device-name');
+                    if (adminRokuIp) adminRokuIp.value = ip;
+                    if (adminRokuName) adminRokuName.value = name;
+                    if (remoteCfgStatus) {
+                        remoteCfgStatus.textContent = `✓ Selected ${name} (${ip}). Click "Test Connection" to ping.`;
+                        remoteCfgStatus.style.color = 'var(--accent-color)';
+                    }
+                }
+            });
+        });
+
         if (remoteCfgSaveBtn) {
             remoteCfgSaveBtn.addEventListener('click', () => {
                 if (!window.RokuECP) return;
