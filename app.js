@@ -43,6 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const viewExplore = document.getElementById('view-explore');
     const viewChangelog = document.getElementById('view-changelog');
     const viewShowTracker = document.getElementById('view-show-tracker');
+    const viewRemote = document.getElementById('view-remote');
+    const remoteHeaderBtn = document.getElementById('remote-header-btn');
     const showTrackerContent = document.getElementById('show-tracker-content');
     const trackerBackBtn = document.getElementById('tracker-back-btn');
     const crumbLibraryLink = document.getElementById('crumb-library-link');
@@ -839,6 +841,10 @@ document.addEventListener('DOMContentLoaded', () => {
             viewShowTracker.classList.toggle('active', viewName === 'show-tracker');
             viewShowTracker.style.display = viewName === 'show-tracker' ? 'block' : 'none';
         }
+        if (viewRemote) {
+            viewRemote.classList.toggle('active', viewName === 'remote');
+            viewRemote.style.display = viewName === 'remote' ? 'block' : 'none';
+        }
         if (viewName !== 'show-tracker') {
             activeVideoEpisodeKey = null;
         }
@@ -865,6 +871,11 @@ document.addEventListener('DOMContentLoaded', () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
             if (targetService) {
                 renderShowTracker(targetService);
+            }
+        } else if (viewName === 'remote') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            if (typeof updateRokuRemoteHeaderDisplay === 'function') {
+                updateRokuRemoteHeaderDisplay();
             }
         } else if (viewName === 'changelog') {
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1600,6 +1611,13 @@ document.addEventListener('DOMContentLoaded', () => {
                                         title="${isPlaying ? 'Close inline video player' : 'Watch episode preview & clips inline'}">
                                         ${isPlaying ? '<span>✕</span> Close Player' : '<span>▶</span> Watch Episode'}
                                     </button>
+                                    <button type="button" class="btn-play-on-roku" 
+                                        data-season="${activeSeasonNum}" 
+                                        data-episode="${ep.episode_number}"
+                                        data-title="${encodeURIComponent(ep.name || '')}"
+                                        title="Launch and play episode on your Roku TV">
+                                        <span>📺</span> Play on Roku
+                                    </button>
                                     <button type="button" class="btn-episode-toggle ${isWatched ? 'is-watched' : ''}" 
                                         data-season="${activeSeasonNum}" 
                                         data-episode="${ep.episode_number}"
@@ -1696,6 +1714,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 const sNum = parseInt(btn.dataset.season, 10);
                 const epNum = parseInt(btn.dataset.episode, 10);
                 await toggleEpisodeWatched(showItem, sNum, epNum, currentEpisodes, seasons);
+            });
+        });
+
+        const epRokuBtns = showTrackerContent.querySelectorAll('.btn-play-on-roku');
+        epRokuBtns.forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (!window.RokuECP || !window.RokuECP.isConfigured()) {
+                    showToast('Please configure your Roku IP in Settings first.', 'error');
+                    requireAdminAuth(() => {
+                        if (settingsModal) settingsModal.classList.remove('hidden');
+                    });
+                    return;
+                }
+
+                const sNum = parseInt(btn.dataset.season, 10);
+                const epNum = parseInt(btn.dataset.episode, 10);
+                const rawTitle = btn.dataset.title ? decodeURIComponent(btn.dataset.title) : '';
+                
+                showToast(`Casting "${showItem.title}" S${sNum}:E${epNum} to Roku TV...`, 'info');
+                const res = await window.RokuECP.playShowOnRoku(showItem, {
+                    season_number: sNum,
+                    episode_number: epNum,
+                    title: rawTitle
+                });
+
+                if (res.success) {
+                    showToast(`Dispatched "${showItem.title}" to ${window.RokuECP.getName()}!`, 'success');
+                } else {
+                    showToast(res.message || 'Failed to send to Roku', 'error');
+                }
             });
         });
     }
@@ -3730,6 +3778,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     const savedKey = localStorage.getItem('tmdb_api_key');
                     if (savedKey) tmdbApiKeyInput.value = savedKey;
                 }
+
+                // Populate Roku Device Settings
+                const rokuDeviceNameInput = document.getElementById('roku-device-name');
+                const rokuIpAddressInput = document.getElementById('roku-ip-address');
+                if (rokuDeviceNameInput && window.RokuECP) {
+                    rokuDeviceNameInput.value = window.RokuECP.getName();
+                }
+                if (rokuIpAddressInput && window.RokuECP) {
+                    rokuIpAddressInput.value = window.RokuECP.getIp();
+                }
+
                 const syncBadge = document.getElementById('cloud-sync-status-badge');
                 if (syncBadge) {
                     if (currentUser) {
@@ -3978,6 +4037,51 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // Roku Settings Save & Test Handlers
+        const saveRokuSettingsBtn = document.getElementById('save-roku-settings-btn');
+        const testRokuBtn = document.getElementById('test-roku-btn');
+        const rokuDeviceNameInput = document.getElementById('roku-device-name');
+        const rokuIpAddressInput = document.getElementById('roku-ip-address');
+        const rokuTestStatus = document.getElementById('roku-test-status');
+
+        if (saveRokuSettingsBtn) {
+            saveRokuSettingsBtn.addEventListener('click', () => {
+                if (!window.RokuECP) return;
+                const ip = (rokuIpAddressInput ? rokuIpAddressInput.value : '').trim();
+                const name = (rokuDeviceNameInput ? rokuDeviceNameInput.value : '').trim() || 'My Roku';
+                window.RokuECP.setIp(ip);
+                window.RokuECP.setName(name);
+                showToast(`Saved Roku: ${name} (${ip || 'No IP'})`, 'success');
+                if (typeof updateRokuRemoteHeaderDisplay === 'function') {
+                    updateRokuRemoteHeaderDisplay();
+                }
+            });
+        }
+
+        if (testRokuBtn) {
+            testRokuBtn.addEventListener('click', async () => {
+                if (!window.RokuECP) return;
+                const ip = (rokuIpAddressInput ? rokuIpAddressInput.value : '').trim();
+                if (ip) window.RokuECP.setIp(ip);
+                if (rokuTestStatus) {
+                    rokuTestStatus.textContent = 'Pinging Roku device...';
+                    rokuTestStatus.style.color = 'var(--text-muted)';
+                }
+                const res = await window.RokuECP.testConnection();
+                if (rokuTestStatus) {
+                    if (res.success) {
+                        rokuTestStatus.textContent = `✓ ${res.message}`;
+                        rokuTestStatus.style.color = 'var(--success-color)';
+                        showToast('Roku command dispatched successfully!', 'success');
+                    } else {
+                        rokuTestStatus.textContent = `✕ ${res.message}`;
+                        rokuTestStatus.style.color = 'var(--danger-color)';
+                        showToast(res.message, 'error');
+                    }
+                }
+            });
+        }
+
         tmdbSearchBtn.addEventListener('click', async () => {
             const query = tmdbSearchQuery.value.trim();
             const key = await window.db.getSystemSetting('tmdb_api_key') || localStorage.getItem('tmdb_api_key');
@@ -4079,6 +4183,121 @@ document.addEventListener('DOMContentLoaded', () => {
                     customAddBtn.style.background = 'var(--accent-color)';
                     customAddBtn.disabled = false;
                 }, 1500);
+            }
+        });
+
+        // Initialize Roku Remote Handlers
+        initRokuRemoteHandlers();
+    }
+
+    function updateRokuRemoteHeaderDisplay() {
+        const dot = document.getElementById('remote-status-dot');
+        const nameDisplay = document.getElementById('remote-device-name-display');
+        const ipDisplay = document.getElementById('remote-ip-display');
+
+        if (!window.RokuECP) return;
+
+        const isConfig = window.RokuECP.isConfigured();
+        const ip = window.RokuECP.getIp();
+        const name = window.RokuECP.getName();
+
+        if (dot) {
+            dot.classList.toggle('unconfigured', !isConfig);
+        }
+        if (nameDisplay) {
+            nameDisplay.textContent = name;
+        }
+        if (ipDisplay) {
+            ipDisplay.textContent = isConfig ? `Target: http://${ip}:8060` : 'IP: Not Configured (Tap ⚙️ Configure)';
+        }
+    }
+
+    function initRokuRemoteHandlers() {
+        const remoteView = document.getElementById('view-remote');
+        if (!remoteView) return;
+
+        updateRokuRemoteHeaderDisplay();
+
+        // Remote Header Button
+        const remoteHeaderBtn = document.getElementById('remote-header-btn');
+        if (remoteHeaderBtn) {
+            remoteHeaderBtn.addEventListener('click', () => {
+                switchView('remote');
+            });
+        }
+
+        // Configure link in remote header
+        const remoteSettingsLinkBtn = document.getElementById('remote-settings-link-btn');
+        if (remoteSettingsLinkBtn) {
+            remoteSettingsLinkBtn.addEventListener('click', () => {
+                requireAdminAuth(() => {
+                    if (settingsModal) {
+                        settingsModal.classList.remove('hidden');
+                        const rokuIpInput = document.getElementById('roku-ip-address');
+                        const rokuNameInput = document.getElementById('roku-device-name');
+                        if (rokuIpInput && window.RokuECP) rokuIpInput.value = window.RokuECP.getIp();
+                        if (rokuNameInput && window.RokuECP) rokuNameInput.value = window.RokuECP.getName();
+                    }
+                });
+            });
+        }
+
+        // Search bar
+        const remoteSearchForm = document.getElementById('remote-search-form');
+        const remoteSearchInput = document.getElementById('remote-search-input');
+        if (remoteSearchForm && remoteSearchInput) {
+            remoteSearchForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const q = remoteSearchInput.value.trim();
+                if (!q) return;
+                if (!window.RokuECP || !window.RokuECP.isConfigured()) {
+                    showToast('Please set your Roku IP address first in Settings.', 'error');
+                    return;
+                }
+                showToast(`Searching "${q}" on Roku TV...`, 'info');
+                const res = await window.RokuECP.searchAndLaunch(q);
+                if (res && res.success) {
+                    showToast(`Dispatched search for "${q}" to TV!`, 'success');
+                }
+            });
+        }
+
+        // Click delegation on the remote controller
+        remoteView.addEventListener('click', async (e) => {
+            const btn = e.target.closest('button');
+            if (!btn) return;
+
+            // Keypress buttons (D-pad, Home, Back, Play, etc.)
+            const key = btn.dataset.key;
+            if (key) {
+                if (!window.RokuECP || !window.RokuECP.isConfigured()) {
+                    showToast('Roku IP not configured. Tap "Configure IP" above.', 'error');
+                    return;
+                }
+                // Visual feedback: briefly highlight
+                btn.style.transform = 'scale(0.92)';
+                setTimeout(() => { btn.style.transform = ''; }, 120);
+
+                const res = await window.RokuECP.sendKey(key);
+                if (res && !res.success) {
+                    showToast(res.message || `Failed to dispatch ${key}`, 'error');
+                }
+                return;
+            }
+
+            // Quick launch channel buttons
+            const channelKey = btn.dataset.channel;
+            if (channelKey) {
+                if (!window.RokuECP || !window.RokuECP.isConfigured()) {
+                    showToast('Roku IP not configured. Tap "Configure IP" above.', 'error');
+                    return;
+                }
+                showToast(`Launching ${channelKey.toUpperCase()} on Roku...`, 'info');
+                const res = await window.RokuECP.launchChannel(channelKey);
+                if (res && !res.success) {
+                    showToast(res.message || 'Failed to launch channel', 'error');
+                }
+                return;
             }
         });
     }

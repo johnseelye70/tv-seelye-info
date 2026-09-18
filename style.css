@@ -1897,7 +1897,7 @@ a { color: var(--accent-color); text-decoration: none; }
         border-radius: 0;
         box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.55);
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         box-sizing: border-box;
         overflow-x: visible;
     }
@@ -3130,7 +3130,515 @@ a { color: var(--accent-color); text-decoration: none; }
         width: 100%;
         justify-content: space-between;
     }
+
+    /* Roku Remote on Mobile */
+    .roku-remote-section {
+        padding: 0;
+        width: 100%;
+    }
+
+    .remote-controller-shell {
+        padding: 18px 14px;
+        border-radius: 20px;
+    }
+
+    .roku-dpad-container {
+        padding: 15px 0;
+    }
+
+    .roku-dpad {
+        width: 180px;
+        height: 180px;
+    }
+
+    .roku-dpad-center {
+        width: 58px;
+        height: 58px;
+        font-size: 0.95rem;
+    }
+
+    .remote-channels-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
+    .remote-channels-title {
+        font-size: 0.82rem;
+    }
 }
+
+/* ==========================================================================
+   ROKU REMOTE CONTROL & ECP SUBSYSTEM (Beta 2.0.0)
+   100% Inline Architecture - Zero Modals
+   ========================================================================== */
+
+.remote-header-btn {
+    font-size: 0.85rem;
+    padding: 0.45rem 0.85rem;
+    border-color: rgba(0, 195, 255, 0.35);
+    background: rgba(0, 195, 255, 0.08);
+    color: #00c3ff;
+    transition: all var(--transition-fast);
+}
+
+.remote-header-btn:hover {
+    background: rgba(0, 195, 255, 0.2);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 12px rgba(0, 195, 255, 0.35);
+    color: #fff;
+}
+
+.roku-remote-section {
+    max-width: 480px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    animation: fadeIn 0.25s ease;
+}
+
+/* Device Status Card */
+.remote-header-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    box-shadow: var(--shadow-main);
+}
+
+.remote-device-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.remote-device-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.remote-status-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+    flex-shrink: 0;
+}
+
+.remote-status-dot.unconfigured {
+    background: #f59e0b;
+    box-shadow: 0 0 8px #f59e0b;
+}
+
+.remote-device-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.remote-ip-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-family: monospace;
+}
+
+/* Search Bar */
+.remote-search-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    padding: 12px;
+}
+
+.remote-search-form {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+
+.remote-search-form input {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text-main);
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.remote-search-form input:focus {
+    border-color: var(--accent-color);
+}
+
+.remote-search-form button {
+    white-space: nowrap;
+    font-size: 0.88rem;
+    padding: 10px 16px;
+}
+
+/* Remote Controller Shell */
+.remote-controller-shell {
+    background: linear-gradient(180deg, #181c28 0%, #111420 100%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 28px;
+    padding: 24px 22px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* Button Rows */
+.remote-btn-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.remote-top-row {
+    padding: 0 4px;
+}
+
+/* Base Remote Button */
+.roku-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    color: var(--text-main);
+    cursor: pointer;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 12px;
+    transition: all 0.15s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.roku-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 10px rgba(0, 195, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.roku-btn:active {
+    transform: scale(0.94);
+    background: rgba(0, 195, 255, 0.2);
+}
+
+.roku-btn-util {
+    flex: 1;
+    min-height: 48px;
+}
+
+.roku-btn-home {
+    flex: 1.2;
+    min-height: 48px;
+    background: rgba(0, 195, 255, 0.1);
+    border-color: rgba(0, 195, 255, 0.3);
+}
+
+.roku-btn-home:hover {
+    background: rgba(0, 195, 255, 0.25);
+}
+
+.roku-btn-power {
+    flex: 1;
+    min-height: 48px;
+    color: #ef4444;
+}
+
+.roku-btn-power:hover {
+    border-color: #ef4444;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);
+    color: #ff6b6b;
+}
+
+.roku-btn-sub {
+    flex: 1;
+    min-height: 44px;
+}
+
+.roku-icon {
+    font-size: 1.15rem;
+    line-height: 1;
+    margin-bottom: 2px;
+}
+
+.roku-btn-tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Directional D-Pad */
+.roku-dpad-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 0;
+}
+
+.roku-dpad {
+    position: relative;
+    width: 210px;
+    height: 210px;
+    border-radius: 50%;
+    background: #141724;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), inset 0 2px 6px rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.roku-dpad-btn {
+    position: absolute;
+    background: transparent;
+    border: none;
+    color: #cbd5e1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: all 0.15s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.roku-dpad-btn:hover {
+    color: #00c3ff;
+    text-shadow: 0 0 8px rgba(0, 195, 255, 0.7);
+}
+
+.roku-dpad-btn:active {
+    transform: scale(0.9);
+}
+
+.roku-dpad-up {
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70px;
+    height: 48px;
+}
+
+.roku-dpad-down {
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70px;
+    height: 48px;
+}
+
+.roku-dpad-left {
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 48px;
+    height: 70px;
+}
+
+.roku-dpad-right {
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 48px;
+    height: 70px;
+}
+
+.roku-dpad-center {
+    position: relative;
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #252b3e 0%, #171b28 100%);
+    border: 2px solid rgba(0, 195, 255, 0.4);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 10px rgba(0, 195, 255, 0.25);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.02em;
+    z-index: 2;
+}
+
+.roku-dpad-center:hover {
+    border-color: #00c3ff;
+    box-shadow: 0 0 16px rgba(0, 195, 255, 0.55);
+    transform: scale(1.04);
+}
+
+.roku-dpad-center:active {
+    transform: scale(0.95);
+}
+
+/* Media & Volume Bars */
+.remote-transport-row, .remote-volume-row {
+    padding: 0 6px;
+}
+
+.roku-btn-media, .roku-btn-vol {
+    flex: 1;
+    min-height: 44px;
+    font-size: 1.05rem;
+    flex-direction: row;
+    gap: 4px;
+    font-weight: 600;
+}
+
+.roku-btn-play {
+    background: rgba(0, 195, 255, 0.15);
+    border-color: rgba(0, 195, 255, 0.4);
+    color: #00c3ff;
+}
+
+.roku-btn-play:hover {
+    background: #00c3ff;
+    color: #000;
+    border-color: #00c3ff;
+}
+
+.roku-btn-mute {
+    color: #f59e0b;
+}
+
+/* Channel Dock */
+.remote-channels-card {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 14px;
+}
+
+.remote-channels-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.remote-channels-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.roku-channel-pill {
+    background: #181c28;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 10px 8px;
+    cursor: pointer;
+    color: #e2e8f0;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-align: center;
+    transition: all 0.18s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.roku-channel-pill:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.roku-channel-pill:active {
+    transform: scale(0.96);
+}
+
+.roku-channel-pill.ch-netflix:hover {
+    border-color: #e50914;
+    color: #ff4d4d;
+    box-shadow: 0 0 12px rgba(229, 9, 20, 0.4);
+}
+
+.roku-channel-pill.ch-disney:hover {
+    border-color: #0063e5;
+    color: #3b82f6;
+    box-shadow: 0 0 12px rgba(0, 99, 229, 0.4);
+}
+
+.roku-channel-pill.ch-hulu:hover {
+    border-color: #1ce783;
+    color: #1ce783;
+    box-shadow: 0 0 12px rgba(28, 231, 131, 0.4);
+}
+
+.roku-channel-pill.ch-peacock:hover {
+    border-color: #00c3ff;
+    color: #00c3ff;
+    box-shadow: 0 0 12px rgba(0, 195, 255, 0.4);
+}
+
+.roku-channel-pill.ch-prime:hover {
+    border-color: #00a8e1;
+    color: #00a8e1;
+    box-shadow: 0 0 12px rgba(0, 168, 225, 0.4);
+}
+
+.roku-channel-pill.ch-appletv:hover {
+    border-color: #cbd5e1;
+    color: #ffffff;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
+}
+
+.roku-channel-pill.ch-youtube:hover {
+    border-color: #ff0000;
+    color: #ff4d4d;
+    box-shadow: 0 0 12px rgba(255, 0, 0, 0.4);
+}
+
+.roku-channel-pill.ch-max:hover {
+    border-color: #002be7;
+    color: #60a5fa;
+    box-shadow: 0 0 12px rgba(0, 43, 231, 0.4);
+}
+
+/* Play on Roku Episode Action Button */
+.btn-play-on-roku {
+    background: rgba(0, 195, 255, 0.12);
+    border: 1px solid rgba(0, 195, 255, 0.35);
+    color: #00c3ff;
+    font-weight: 600;
+    font-size: 0.8rem;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all var(--transition-fast);
+}
+
+.btn-play-on-roku:hover {
+    background: #00c3ff;
+    color: #000;
+    border-color: #00c3ff;
+    box-shadow: 0 0 10px rgba(0, 195, 255, 0.4);
+}
+
+.btn-play-on-roku:active {
+    transform: scale(0.96);
+}
+
 
 
 

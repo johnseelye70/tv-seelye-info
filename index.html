@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.9.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.9.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.9.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2.0.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=2.0.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2.0.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=1.9.0">
+    <link rel="stylesheet" href="style.css?v=2.0.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -29,13 +29,14 @@
             <div class="logo-subline">
                 <span class="domain">tv.seelye.info</span>
                 <span class="logo-divider">•</span>
-                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.9.0</button>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 2.0.0</button>
             </div>
         </div>
         <div class="auth-section">
             <a href="https://seelye.info" id="btn-home-seelye" class="btn-home-seelye" title="seelye.info Home" aria-label="seelye.info Home">
                 <span class="home-icon">🏠</span>
             </a>
+            <button id="remote-header-btn" class="btn secondary-btn" type="button" title="Open Roku TV Remote">📱 Remote</button>
             <button id="settings-btn" class="btn secondary-btn">Settings</button>
             <span id="auth-status-badge" class="auth-badge">Checking auth...</span>
             <button id="auth-btn" class="btn primary-btn">Login</button>
@@ -58,6 +59,10 @@
             <button class="nav-tab" id="tab-explore" data-view="explore">
                 <span class="nav-tab-icon">📺</span>
                 <span class="nav-tab-label"><span class="label-full">Explore Streaming Services</span><span class="label-short">Explore</span></span>
+            </button>
+            <button class="nav-tab" id="tab-remote" data-view="remote">
+                <span class="nav-tab-icon">📱</span>
+                <span class="nav-tab-label"><span class="label-full">Roku Remote</span><span class="label-short">Remote</span></span>
             </button>
         </nav>
 
@@ -243,6 +248,146 @@
             </section>
         </div>
 
+        <!-- VIEW 5: Roku Remote Control (100% Inline Architecture) -->
+        <div class="view-panel" id="view-remote" style="display: none;">
+            <section class="roku-remote-section">
+                <!-- Top Header & Device Status Row -->
+                <div class="remote-header-card">
+                    <div class="remote-device-info">
+                        <div class="remote-device-badge">
+                            <span class="remote-status-dot" id="remote-status-dot"></span>
+                            <span class="remote-device-name" id="remote-device-name-display">My Roku</span>
+                        </div>
+                        <div class="remote-ip-label" id="remote-ip-display">IP: Not Configured</div>
+                    </div>
+                    <div class="remote-header-actions">
+                        <button type="button" class="btn secondary-btn" id="remote-settings-link-btn" title="Configure Roku IP">
+                            ⚙️ Configure IP
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Roku Quick Search Bar -->
+                <div class="remote-search-card">
+                    <form id="remote-search-form" class="remote-search-form">
+                        <input type="text" id="remote-search-input" placeholder="Search title &amp; launch on Roku TV..." aria-label="Search on Roku">
+                        <button type="submit" class="btn primary-btn" id="remote-search-submit-btn">
+                            <span>🔍 Launch on TV</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- The Virtual Remote Controller Body -->
+                <div class="remote-controller-shell">
+                    <!-- Top Utility Row: Back, Home, Power -->
+                    <div class="remote-btn-row remote-top-row">
+                        <button type="button" class="roku-btn roku-btn-util" data-key="Back" title="Back" aria-label="Back">
+                            <span class="roku-icon">⮌</span>
+                            <span class="roku-btn-tag">Back</span>
+                        </button>
+                        <button type="button" class="roku-btn roku-btn-home" data-key="Home" title="Home" aria-label="Home">
+                            <span class="roku-icon">🏠</span>
+                            <span class="roku-btn-tag">Home</span>
+                        </button>
+                        <button type="button" class="roku-btn roku-btn-power" data-key="PowerOff" title="Power" aria-label="Power">
+                            <span class="roku-icon">⏻</span>
+                            <span class="roku-btn-tag">Power</span>
+                        </button>
+                    </div>
+
+                    <!-- Directional D-Pad -->
+                    <div class="roku-dpad-container">
+                        <div class="roku-dpad">
+                            <button type="button" class="roku-dpad-btn roku-dpad-up" data-key="Up" title="Up" aria-label="Up">
+                                <span>▲</span>
+                            </button>
+                            <button type="button" class="roku-dpad-btn roku-dpad-left" data-key="Left" title="Left" aria-label="Left">
+                                <span>◀</span>
+                            </button>
+                            <button type="button" class="roku-dpad-btn roku-dpad-center" data-key="Select" title="Select / OK" aria-label="Select">
+                                <span>OK</span>
+                            </button>
+                            <button type="button" class="roku-dpad-btn roku-dpad-right" data-key="Right" title="Right" aria-label="Right">
+                                <span>▶</span>
+                            </button>
+                            <button type="button" class="roku-dpad-btn roku-dpad-down" data-key="Down" title="Down" aria-label="Down">
+                                <span>▼</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Secondary Utility Row: Replay, Options (*) -->
+                    <div class="remote-btn-row">
+                        <button type="button" class="roku-btn roku-btn-sub" data-key="InstantReplay" title="Instant Replay (10s back)" aria-label="Instant Replay">
+                            <span class="roku-icon">↺</span>
+                            <span class="roku-btn-tag">Replay</span>
+                        </button>
+                        <button type="button" class="roku-btn roku-btn-sub" data-key="Info" title="Options / Star (*)" aria-label="Options">
+                            <span class="roku-icon">✱</span>
+                            <span class="roku-btn-tag">Options</span>
+                        </button>
+                    </div>
+
+                    <!-- Transport / Playback Controls -->
+                    <div class="remote-btn-row remote-transport-row">
+                        <button type="button" class="roku-btn roku-btn-media" data-key="Rev" title="Rewind" aria-label="Rewind">
+                            <span>⏪</span>
+                        </button>
+                        <button type="button" class="roku-btn roku-btn-media roku-btn-play" data-key="Play" title="Play / Pause" aria-label="Play or Pause">
+                            <span>⏯</span>
+                        </button>
+                        <button type="button" class="roku-btn roku-btn-media" data-key="Fwd" title="Fast Forward" aria-label="Fast Forward">
+                            <span>⏩</span>
+                        </button>
+                    </div>
+
+                    <!-- Audio Volume Bar -->
+                    <div class="remote-btn-row remote-volume-row">
+                        <button type="button" class="roku-btn roku-btn-vol" data-key="VolumeDown" title="Volume Down" aria-label="Volume Down">
+                            <span>🔉 -</span>
+                        </button>
+                        <button type="button" class="roku-btn roku-btn-vol roku-btn-mute" data-key="VolumeMute" title="Mute" aria-label="Mute">
+                            <span>🔇</span>
+                        </button>
+                        <button type="button" class="roku-btn roku-btn-vol" data-key="VolumeUp" title="Volume Up" aria-label="Volume Up">
+                            <span>🔊 +</span>
+                        </button>
+                    </div>
+
+                    <!-- Streaming App Launch Dock -->
+                    <div class="remote-channels-card">
+                        <h4 class="remote-channels-title">Quick Launch Channels</h4>
+                        <div class="remote-channels-grid">
+                            <button type="button" class="roku-channel-pill ch-netflix" data-channel="netflix" title="Launch Netflix">
+                                <span class="ch-name">Netflix</span>
+                            </button>
+                            <button type="button" class="roku-channel-pill ch-disney" data-channel="disney" title="Launch Disney+">
+                                <span class="ch-name">Disney+</span>
+                            </button>
+                            <button type="button" class="roku-channel-pill ch-hulu" data-channel="hulu" title="Launch Hulu">
+                                <span class="ch-name">Hulu</span>
+                            </button>
+                            <button type="button" class="roku-channel-pill ch-peacock" data-channel="peacock" title="Launch Peacock">
+                                <span class="ch-name">Peacock</span>
+                            </button>
+                            <button type="button" class="roku-channel-pill ch-prime" data-channel="prime" title="Launch Prime Video">
+                                <span class="ch-name">Prime Video</span>
+                            </button>
+                            <button type="button" class="roku-channel-pill ch-appletv" data-channel="appletv" title="Launch Apple TV+">
+                                <span class="ch-name">Apple TV+</span>
+                            </button>
+                            <button type="button" class="roku-channel-pill ch-youtube" data-channel="youtube" title="Launch YouTube">
+                                <span class="ch-name">YouTube</span>
+                            </button>
+                            <button type="button" class="roku-channel-pill ch-max" data-channel="max" title="Launch Max">
+                                <span class="ch-name">Max</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
         <!-- VIEW 4: Version History & Changelog (100% Inline, Admin Protected) -->
         <div class="view-panel" id="view-changelog" style="display: none;">
             <section class="changelog-view-section">
@@ -250,7 +395,7 @@
                     <div>
                         <div class="changelog-title-group">
                             <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
-                            <span class="changelog-current-badge">Beta 1.9.0</span>
+                            <span class="changelog-current-badge">Beta 2.0.0</span>
                         </div>
                         <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
                     </div>
@@ -263,8 +408,14 @@
                     <ul class="changelog-timeline-list">
                         <li class="changelog-entry">
                             <div class="changelog-entry-header">
-                                <span class="changelog-version-tag">Beta 1.9.0</span>
+                                <span class="changelog-version-tag">Beta 2.0.0</span>
                                 <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Roku TV Remote Control &amp; ECP Hardware Subsystem:</strong> Integrated direct client-side LAN communication with physical Roku streaming devices via the Roku External Control Protocol (ECP). Features an elegant 100% inline virtual remote control deck with tactile directional D-pad, transport controls (Play, Pause, Replay, Rewind, Fast-Forward), volume adjustment, universal system search launcher, and branded quick-launch channel tiles for Disney+, Netflix, Hulu, Peacock, Prime Video, Apple TV+, and YouTube. Added one-click &ldquo;Play on Roku&rdquo; actions to episode cards and persistent device configuration in Settings with live connectivity ping verification.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 1.9.0</span>
                             </div>
                             <p class="changelog-desc"><strong>Seelye.info Ecosystem Home Navigation:</strong> Added a dedicated icon-only home navigation button to the top header matching ecosystem design standards across <code>seelye-tree</code>, <code>lions.seelye.info</code>, and <code>games.seelye.info</code>. Provides instant one-click return to the main family portal at <code>https://seelye.info</code> without text clutter, styled with a circular dark glassmorphic surface, subtle interactive hover glow, and responsive scaling across mobile and desktop viewports.</p>
                         </li>
@@ -539,6 +690,29 @@
                         <button id="force-cloud-sync-btn" class="btn primary-btn" type="button" style="padding: 8px 16px; font-size: 0.88rem;">☁️ Sync Cloud Now</button>
                     </div>
                 </div>
+
+                <!-- Roku Device Integration Config -->
+                <div class="admin-card" id="admin-roku-card" style="margin-top: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <h3 style="margin: 0;">📺 Roku TV Integration</h3>
+                        <span id="roku-settings-status" class="status-pill" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; background: rgba(0, 195, 255, 0.15); color: #00c3ff;">ECP Port 8060</span>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 14px;">Connect directly to your Roku over your home Wi-Fi to launch shows, control playback, and use the in-app remote.</p>
+                    <div class="input-group">
+                        <label for="roku-device-name">Roku Device Name</label>
+                        <input type="text" id="roku-device-name" placeholder="e.g. Living Room Roku">
+                    </div>
+                    <div class="input-group">
+                        <label for="roku-ip-address">Roku IP Address (on your local Wi-Fi)</label>
+                        <input type="text" id="roku-ip-address" placeholder="e.g. 192.168.1.50">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: block;">Find on your TV: <strong>Settings &rsaquo; Network &rsaquo; About</strong></span>
+                    </div>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                        <button id="save-roku-settings-btn" class="btn primary-btn" type="button">Save Roku Settings</button>
+                        <button id="test-roku-btn" class="btn secondary-btn" type="button">📡 Test Connection (Ping)</button>
+                    </div>
+                    <p id="roku-test-status" class="status-msg" style="margin-top: 10px;"></p>
+                </div>
             </div>
         </div>
     </div>
@@ -608,8 +782,9 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=1.9.0"></script>
-    <script src="db.js?v=1.9.0"></script>
-    <script src="app.js?v=1.9.0"></script>
+    <script src="service_catalog.js?v=2.0.0"></script>
+    <script src="db.js?v=2.0.0"></script>
+    <script src="roku.js?v=2.0.0"></script>
+    <script src="app.js?v=2.0.0"></script>
 </body>
 </html>
