@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.2.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.2.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.2.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.3.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.3.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.3.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=1.2.0">
+    <link rel="stylesheet" href="style.css?v=1.3.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -29,7 +29,7 @@
             <div class="logo-subline">
                 <span class="domain">tv.seelye.info</span>
                 <span class="logo-divider">•</span>
-                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.2.0</button>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.3.0</button>
             </div>
         </div>
         <div class="auth-section">
@@ -100,6 +100,32 @@
                     <button class="pill-btn" data-service="appletv">Apple TV+ <span class="svc-count" id="svc-count-appletv"></span></button>
                 </div>
 
+                <!-- Mobile Consolidated Filter Bar (Phone Only: eliminates menu clump) -->
+                <div class="mobile-filter-bar" id="mobile-library-filters">
+                    <div class="mobile-select-group">
+                        <span class="mobile-select-icon">🎬</span>
+                        <select id="mobile-status-select" class="mobile-filter-select" aria-label="Filter library by status">
+                            <option value="all">All Shows</option>
+                            <option value="watching">Watching</option>
+                            <option value="want_to_watch">Want to Watch</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                    <div class="mobile-select-group">
+                        <span class="mobile-select-icon">📺</span>
+                        <select id="mobile-service-select" class="mobile-filter-select" aria-label="Filter library by provider">
+                            <option value="all">All Providers</option>
+                            <option value="netflix">Netflix</option>
+                            <option value="disney">Disney+</option>
+                            <option value="hulu">Hulu</option>
+                            <option value="peacock">Peacock</option>
+                            <option value="prime">Prime Video</option>
+                            <option value="youtube">YouTube TV</option>
+                            <option value="appletv">Apple TV+</option>
+                        </select>
+                    </div>
+                </div>
+
                 <!-- Personal Search Bar -->
                 <div class="search-bar">
                     <!-- Decoy inputs for aggressive password managers -->
@@ -161,6 +187,22 @@
                     <button class="pill-btn" data-service="appletv">Apple TV+</button>
                 </div>
 
+                <!-- Mobile Explore Provider Selector (Phone Only: eliminates menu clump) -->
+                <div class="mobile-filter-bar mobile-explore-filter-bar" id="mobile-explore-filters" style="margin-bottom: 20px;">
+                    <div class="mobile-select-group" style="width: 100%;">
+                        <span class="mobile-select-icon">📺</span>
+                        <select id="mobile-explore-select" class="mobile-filter-select" aria-label="Choose streaming platform">
+                            <option value="netflix">Netflix</option>
+                            <option value="disney">Disney+</option>
+                            <option value="hulu">Hulu</option>
+                            <option value="peacock">Peacock</option>
+                            <option value="prime">Prime Video</option>
+                            <option value="youtube">YouTube TV</option>
+                            <option value="appletv">Apple TV+</option>
+                        </select>
+                    </div>
+                </div>
+
                 <!-- Service Discovery Header & Grid -->
                 <div class="service-discovery-section" id="service-discovery-container">
                     <div class="service-discovery-header">
@@ -183,7 +225,7 @@
                     <div>
                         <div class="changelog-title-group">
                             <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
-                            <span class="changelog-current-badge">Beta 1.2.0</span>
+                            <span class="changelog-current-badge">Beta 1.3.0</span>
                         </div>
                         <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
                     </div>
@@ -196,8 +238,14 @@
                     <ul class="changelog-timeline-list">
                         <li class="changelog-entry">
                             <div class="changelog-entry-header">
-                                <span class="changelog-version-tag">Beta 1.2.0</span>
+                                <span class="changelog-version-tag">Beta 1.3.0</span>
                                 <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Streamlined Native Mobile Architecture &amp; Bottom Tab Bar:</strong> Completely decluttered the iPhone screen by replacing stacked vertical menu clumps with a dedicated iOS Bottom Navigation Bar and unified native dropdown filter controls. Relocated main app navigation (Library, Top Picks, Explore) to a fixed thumb-accessible bottom tab bar with safe-area insets. Consolidated 12 desktop pill buttons into a compact, space-efficient control bar featuring native Status and Provider selection wheels, instantly freeing up the top of the viewport and placing library shows center stage.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 1.2.0</span>
                             </div>
                             <p class="changelog-desc"><strong>Eliminated Horizontal Slider Bars on iPhone:</strong> Redesigned mobile navigation and filter controls into native screen-bound layouts without horizontal slider bars or scroll traps. Replaced the scrolling top navigation bar with a balanced 3-column segmented control (Library, Top Picks, Explore Streams) with stacked icons. Converted library status filters into a touch-friendly 2x2 grid and streaming provider selectors into cleanly wrapping multi-row pill clusters so all options are 100% visible and accessible without horizontal sliding.</p>
                         </li>
@@ -489,8 +537,8 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=1.2.0"></script>
-    <script src="db.js?v=1.2.0"></script>
-    <script src="app.js?v=1.2.0"></script>
+    <script src="service_catalog.js?v=1.3.0"></script>
+    <script src="db.js?v=1.3.0"></script>
+    <script src="app.js?v=1.3.0"></script>
 </body>
 </html>

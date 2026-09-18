@@ -63,6 +63,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const catalogGrid = document.getElementById('catalog-grid');
     const libraryStatusFilters = document.getElementById('library-status-filters');
     const libraryServiceFilters = document.getElementById('library-service-filters');
+    const mobileStatusSelect = document.getElementById('mobile-status-select');
+    const mobileServiceSelect = document.getElementById('mobile-service-select');
+    const mobileExploreSelect = document.getElementById('mobile-explore-select');
     const searchInput = document.getElementById('library-filter-field');
     const continueWatchingContainer = document.getElementById('continue-watching-container');
     const continueWatchingGrid = document.getElementById('continue-watching-grid');
@@ -826,6 +829,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         btn.classList.toggle('active', btn.dataset.service === targetService);
                     });
                 }
+                if (mobileExploreSelect) {
+                    mobileExploreSelect.value = targetService;
+                }
             }
             renderServiceDiscovery(currentExploreService);
         } else if (viewName === 'changelog') {
@@ -1036,6 +1042,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (libraryServiceFilters) {
             libraryServiceFilters.querySelectorAll('.pill-btn').forEach(b => b.classList.toggle('active', b.dataset.service === 'all'));
         }
+        if (mobileStatusSelect) mobileStatusSelect.value = 'all';
+        if (mobileServiceSelect) mobileServiceSelect.value = 'all';
         renderLibrary();
     }
     window.resetLibraryFilters = resetLibraryFilters;
@@ -1067,6 +1075,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.textContent = count > 0 ? `(${count})` : '';
             }
         });
+
+        // Mobile dropdown labels with live counter badges
+        if (mobileStatusSelect) {
+            const optAll = mobileStatusSelect.querySelector('option[value="all"]');
+            const optWatch = mobileStatusSelect.querySelector('option[value="watching"]');
+            const optWant = mobileStatusSelect.querySelector('option[value="want_to_watch"]');
+            const optComp = mobileStatusSelect.querySelector('option[value="completed"]');
+            if (optAll) optAll.textContent = `All Shows (${total})`;
+            if (optWatch) optWatch.textContent = `Watching (${watching})`;
+            if (optWant) optWant.textContent = `Want to Watch (${want})`;
+            if (optComp) optComp.textContent = `Completed (${completed})`;
+        }
+        if (mobileServiceSelect) {
+            ['netflix', 'disney', 'hulu', 'peacock', 'prime', 'youtube', 'appletv'].forEach(svc => {
+                const opt = mobileServiceSelect.querySelector(`option[value="${svc}"]`);
+                if (opt) {
+                    const count = allContent.filter(item => matchesServiceFilter(item, svc)).length;
+                    const metaName = serviceMeta[svc]?.name || svc;
+                    opt.textContent = count > 0 ? `${metaName} (${count})` : metaName;
+                }
+            });
+        }
 
         // Recs badge in main nav
         if (recCountBadge) {
@@ -2556,6 +2586,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 libraryStatusFilters.querySelectorAll('.pill-btn').forEach(btn => btn.classList.remove('active'));
                 pill.classList.add('active');
                 currentStatusFilter = pill.dataset.status || 'all';
+                if (mobileStatusSelect) mobileStatusSelect.value = currentStatusFilter;
                 renderLibrary();
             });
         }
@@ -2568,6 +2599,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 libraryServiceFilters.querySelectorAll('.pill-btn').forEach(btn => btn.classList.remove('active'));
                 pill.classList.add('active');
                 currentLibraryServiceFilter = pill.dataset.service || 'all';
+                if (mobileServiceSelect) mobileServiceSelect.value = currentLibraryServiceFilter;
                 renderLibrary();
             });
         }
@@ -2580,6 +2612,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 exploreServiceFilters.querySelectorAll('.pill-btn').forEach(btn => btn.classList.remove('active'));
                 pill.classList.add('active');
                 currentExploreService = pill.dataset.service || 'netflix';
+                if (mobileExploreSelect) mobileExploreSelect.value = currentExploreService;
+                renderServiceDiscovery(currentExploreService);
+            });
+        }
+
+        // Mobile Filter Select Dropdowns (Phone optimized: eliminates clumping)
+        if (mobileStatusSelect) {
+            mobileStatusSelect.addEventListener('change', (e) => {
+                currentStatusFilter = e.target.value;
+                if (libraryStatusFilters) {
+                    libraryStatusFilters.querySelectorAll('.pill-btn').forEach(btn => {
+                        btn.classList.toggle('active', (btn.dataset.status || 'all') === currentStatusFilter);
+                    });
+                }
+                renderLibrary();
+            });
+        }
+
+        if (mobileServiceSelect) {
+            mobileServiceSelect.addEventListener('change', (e) => {
+                currentLibraryServiceFilter = e.target.value;
+                if (libraryServiceFilters) {
+                    libraryServiceFilters.querySelectorAll('.pill-btn').forEach(btn => {
+                        btn.classList.toggle('active', (btn.dataset.service || 'all') === currentLibraryServiceFilter);
+                    });
+                }
+                renderLibrary();
+            });
+        }
+
+        if (mobileExploreSelect) {
+            mobileExploreSelect.addEventListener('change', (e) => {
+                currentExploreService = e.target.value;
+                if (exploreServiceFilters) {
+                    exploreServiceFilters.querySelectorAll('.pill-btn').forEach(btn => {
+                        btn.classList.toggle('active', (btn.dataset.service || 'netflix') === currentExploreService);
+                    });
+                }
                 renderServiceDiscovery(currentExploreService);
             });
         }
