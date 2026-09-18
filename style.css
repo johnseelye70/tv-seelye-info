@@ -852,6 +852,14 @@ a { color: var(--accent-color); text-decoration: none; }
     user-select: none;
 }
 
+.label-short {
+    display: none;
+}
+
+.label-full {
+    display: inline;
+}
+
 .nav-tab:hover {
     color: var(--text-main);
     background: rgba(255, 255, 255, 0.05);
@@ -1806,28 +1814,58 @@ a { color: var(--accent-color); text-decoration: none; }
         box-sizing: border-box;
     }
 
-    /* Primary Navigation Bar on Phone */
+    .label-short {
+        display: inline;
+    }
+
+    .label-full {
+        display: none;
+    }
+
+    /* Primary Navigation Bar on Phone (Eliminates horizontal slider bar) */
     .dashboard-nav {
-        margin-bottom: 1.2rem;
-        padding: 0.3rem;
-        gap: 0.35rem;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        margin-bottom: 1.15rem;
+        padding: 5px;
+        gap: 5px;
         width: 100%;
         box-sizing: border-box;
+        overflow-x: visible; /* NO horizontal slider bar */
+        border-radius: 12px;
     }
 
     .nav-tab {
-        padding: 0.5rem 0.75rem;
-        font-size: 0.84rem;
-        gap: 0.35rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 4px;
+        font-size: 0.78rem;
+        gap: 3px;
+        text-align: center;
+        white-space: nowrap;
+        min-width: 0;
+        width: 100%;
+        box-sizing: border-box;
+        border-radius: 8px;
     }
 
     .nav-tab-icon {
-        font-size: 0.95rem;
+        font-size: 1.2rem;
+        line-height: 1;
+    }
+
+    .nav-tab-label {
+        font-size: 0.76rem;
+        font-weight: 600;
+        line-height: 1.2;
     }
 
     .nav-tab-badge {
-        font-size: 0.7rem;
+        font-size: 0.68rem;
         padding: 1px 5px;
+        margin-top: 2px;
     }
 
     /* Personal Library & Catalog Grids on Phone (Clean 2-Column Mobile Streaming) */
@@ -1865,21 +1903,67 @@ a { color: var(--accent-color); text-decoration: none; }
         height: 230px;
     }
 
-    /* Filters Section on Phone */
+    /* Filters Section on Phone (Wrap into clean responsive rows, NO horizontal slider bars) */
     .filters-section {
         flex-direction: column;
         align-items: stretch;
-        gap: 0.75rem;
+        gap: 0.85rem;
     }
 
     .filter-bar {
+        display: flex;
+        flex-wrap: wrap; /* Wrap pills into visible rows instead of sliding horizontally */
+        gap: 6px;
+        overflow-x: visible; /* NO horizontal slider bar */
+        padding-bottom: 0;
         width: 100%;
-        padding-bottom: 0.25rem;
+        box-sizing: border-box;
+    }
+
+    /* Status Filters formatted as a balanced 2x2 grid on phone */
+    .status-filter-bar {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+        width: 100%;
+        box-sizing: border-box;
+        overflow-x: visible;
+    }
+
+    .status-filter-bar .pill-btn {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        font-size: 0.82rem;
+        box-sizing: border-box;
+        text-align: left;
+    }
+
+    .status-filter-bar .status-count {
+        background: rgba(255, 255, 255, 0.15);
+        padding: 1px 6px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        margin-left: 6px;
+    }
+
+    /* Provider Filter Pills wrap cleanly into rows without sliding */
+    .provider-filter-bar, #explore-service-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        width: 100%;
+        box-sizing: border-box;
+        overflow-x: visible; /* NO horizontal slider bar */
     }
 
     .pill-btn {
-        padding: 0.4rem 0.8rem;
-        font-size: 0.82rem;
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        border-radius: 16px;
+        flex-shrink: 0;
     }
 
     .search-bar {

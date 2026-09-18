@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.1.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.1.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.1.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.2.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.2.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.2.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=1.1.0">
+    <link rel="stylesheet" href="style.css?v=1.2.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -29,7 +29,7 @@
             <div class="logo-subline">
                 <span class="domain">tv.seelye.info</span>
                 <span class="logo-divider">•</span>
-                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.1.0</button>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.2.0</button>
             </div>
         </div>
         <div class="auth-section">
@@ -40,21 +40,21 @@
     </header>
 
     <main class="dashboard">
-        <!-- Primary Inline Navigation Bar -->
+        <!-- Primary Inline Navigation Bar (100% Screen Bound, No Slider Bars on Phone) -->
         <nav class="dashboard-nav" id="main-nav" aria-label="Main Navigation">
             <button class="nav-tab active" id="tab-library" data-view="library">
                 <span class="nav-tab-icon">🎬</span>
-                <span class="nav-tab-label">My Library</span>
+                <span class="nav-tab-label"><span class="label-full">My Library</span><span class="label-short">Library</span></span>
                 <span class="nav-tab-badge" id="library-count-badge">0</span>
             </button>
             <button class="nav-tab" id="tab-recommendations" data-view="recommendations">
                 <span class="nav-tab-icon">✨</span>
-                <span class="nav-tab-label">Smart Recommendations</span>
+                <span class="nav-tab-label"><span class="label-full">Smart Recommendations</span><span class="label-short">Top Picks</span></span>
                 <span class="nav-tab-badge pulse-badge" id="rec-count-badge" style="display: none;">Top Picks</span>
             </button>
             <button class="nav-tab" id="tab-explore" data-view="explore">
                 <span class="nav-tab-icon">📺</span>
-                <span class="nav-tab-label">Explore Streaming Services</span>
+                <span class="nav-tab-label"><span class="label-full">Explore Streaming Services</span><span class="label-short">Explore</span></span>
             </button>
         </nav>
 
@@ -183,7 +183,7 @@
                     <div>
                         <div class="changelog-title-group">
                             <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
-                            <span class="changelog-current-badge">Beta 1.1.0</span>
+                            <span class="changelog-current-badge">Beta 1.2.0</span>
                         </div>
                         <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
                     </div>
@@ -196,8 +196,14 @@
                     <ul class="changelog-timeline-list">
                         <li class="changelog-entry">
                             <div class="changelog-entry-header">
-                                <span class="changelog-version-tag">Beta 1.1.0</span>
+                                <span class="changelog-version-tag">Beta 1.2.0</span>
                                 <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Eliminated Horizontal Slider Bars on iPhone:</strong> Redesigned mobile navigation and filter controls into native screen-bound layouts without horizontal slider bars or scroll traps. Replaced the scrolling top navigation bar with a balanced 3-column segmented control (Library, Top Picks, Explore Streams) with stacked icons. Converted library status filters into a touch-friendly 2x2 grid and streaming provider selectors into cleanly wrapping multi-row pill clusters so all options are 100% visible and accessible without horizontal sliding.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 1.1.0</span>
                             </div>
                             <p class="changelog-desc"><strong>Multi-Device Persistence &amp; Responsive Device Differentiation:</strong> Implemented real-time bidirectional library and watchlist synchronization across laptop, iPhone, and iPad sessions leveraging Supabase account metadata and non-destructive reconciliation (<code>mergeLibrarySafely</code>) with push-guards against empty fresh devices. Added dynamic device differentiation (phone, tablet, desktop) and orientation tracking (portrait, landscape). Re-engineered the mobile header to fit cleanly within iPhone bounds without horizontal overflow or elastic wiggling, optimized iPad grid viewports for both portrait (3 cols) and landscape (4–5 cols), and integrated a phone landscape rotation advisory.</p>
                         </li>
@@ -483,8 +489,8 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=1.1.0"></script>
-    <script src="db.js?v=1.1.0"></script>
-    <script src="app.js?v=1.1.0"></script>
+    <script src="service_catalog.js?v=1.2.0"></script>
+    <script src="db.js?v=1.2.0"></script>
+    <script src="app.js?v=1.2.0"></script>
 </body>
 </html>
