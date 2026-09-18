@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.4.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.4.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.4.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.5.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.5.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.5.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=1.4.0">
+    <link rel="stylesheet" href="style.css?v=1.5.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -29,7 +29,7 @@
             <div class="logo-subline">
                 <span class="domain">tv.seelye.info</span>
                 <span class="logo-divider">•</span>
-                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.4.0</button>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.5.0</button>
             </div>
         </div>
         <div class="auth-section">
@@ -85,7 +85,7 @@
                     <button class="pill-btn active" data-status="all">All Shows <span class="status-count" id="count-status-all">0</span></button>
                     <button class="pill-btn" data-status="watching">Watching <span class="status-count" id="count-status-watching">0</span></button>
                     <button class="pill-btn" data-status="want_to_watch">Want to Watch <span class="status-count" id="count-status-want">0</span></button>
-                    <button class="pill-btn" data-status="completed">Completed <span class="status-count" id="count-status-completed">0</span></button>
+                    <button class="pill-btn" data-status="completed">📦 Archive <span class="status-count" id="count-status-completed">0</span></button>
                 </div>
 
                 <!-- Provider Filter Pills within Library -->
@@ -108,7 +108,7 @@
                             <option value="all">All Shows</option>
                             <option value="watching">Watching</option>
                             <option value="want_to_watch">Want to Watch</option>
-                            <option value="completed">Completed</option>
+                            <option value="completed">📦 Archive / Completed</option>
                         </select>
                     </div>
                     <div class="mobile-select-group">
@@ -218,6 +218,28 @@
             </section>
         </div>
 
+        <!-- VIEW: Show Tracker & Episode Checklist (100% Inline Architecture) -->
+        <div class="view-panel" id="view-show-tracker" style="display: none;">
+            <section class="show-tracker-section">
+                <!-- Top Navigation & Breadcrumbs -->
+                <div class="tracker-nav-bar">
+                    <button type="button" class="btn secondary-btn" id="tracker-back-btn">
+                        <span>&larr;</span> Back to My Library
+                    </button>
+                    <div class="tracker-breadcrumb" id="tracker-breadcrumb">
+                        <span class="crumb-link" id="crumb-library-link" style="cursor: pointer;">My Library</span>
+                        <span class="crumb-separator">&rsaquo;</span>
+                        <span class="crumb-active" id="tracker-crumb-title">Episode Tracker</span>
+                    </div>
+                </div>
+
+                <!-- Dynamic Show Tracker Body (Hero Header, Progress Card, Season Tabs, Episode Checklist) -->
+                <div id="show-tracker-content" class="show-tracker-content">
+                    <!-- Injected dynamically via renderShowTracker in app.js -->
+                </div>
+            </section>
+        </div>
+
         <!-- VIEW 4: Version History & Changelog (100% Inline, Admin Protected) -->
         <div class="view-panel" id="view-changelog" style="display: none;">
             <section class="changelog-view-section">
@@ -225,7 +247,7 @@
                     <div>
                         <div class="changelog-title-group">
                             <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
-                            <span class="changelog-current-badge">Beta 1.4.0</span>
+                            <span class="changelog-current-badge">Beta 1.5.0</span>
                         </div>
                         <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
                     </div>
@@ -238,8 +260,14 @@
                     <ul class="changelog-timeline-list">
                         <li class="changelog-entry">
                             <div class="changelog-entry-header">
-                                <span class="changelog-version-tag">Beta 1.4.0</span>
+                                <span class="changelog-version-tag">Beta 1.5.0</span>
                                 <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Season &amp; Episode Watch Tracking, Checklists &amp; Series Archive:</strong> Added comprehensive season and episode tracking rendered 100% inline directly in the dashboard stream without modal overlays. Provides interactive episode check-off cards with episode stills, air dates, runtimes, and synopses; one-click "Mark Season Complete" actions; and a prominent "Mark Series Complete &amp; Move to Archive" workflow. Integrated an Archive status filter into My Library (both desktop pills and mobile selection) to cleanly separate finished series from active watches while preserving archived shows as high-affinity positive seeds in the Smart Recommendation Engine. Features multi-device union-merging for watched episode sets.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 1.4.0</span>
                             </div>
                             <p class="changelog-desc"><strong>Hardened Multi-Device PostgreSQL Persistence:</strong> Solved cross-device synchronization failures across laptop, iPhone, iPad, and desktop sessions. Replaced fragile auth metadata payloads with centralized PostgreSQL cloud storage in <code>system_settings</code> keyed by unique user UUID and deterministic email hashes. Enabled immediate awaited cloud sync on show additions, status toggles, ratings, and deletions with push-guard non-destructive reconciliation (<code>mergeLibrarySafely</code>). Added instant automated cloud synchronization upon login with user toast feedback, seamless background tab-visibility refresh, and an explicit manual cloud sync control in Settings.</p>
                         </li>
@@ -553,8 +581,8 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=1.4.0"></script>
-    <script src="db.js?v=1.4.0"></script>
-    <script src="app.js?v=1.4.0"></script>
+    <script src="service_catalog.js?v=1.5.0"></script>
+    <script src="db.js?v=1.5.0"></script>
+    <script src="app.js?v=1.5.0"></script>
 </body>
 </html>

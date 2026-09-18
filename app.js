@@ -42,11 +42,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const viewRecommendations = document.getElementById('view-recommendations');
     const viewExplore = document.getElementById('view-explore');
     const viewChangelog = document.getElementById('view-changelog');
+    const viewShowTracker = document.getElementById('view-show-tracker');
+    const showTrackerContent = document.getElementById('show-tracker-content');
+    const trackerBackBtn = document.getElementById('tracker-back-btn');
+    const crumbLibraryLink = document.getElementById('crumb-library-link');
+    const trackerCrumbTitle = document.getElementById('tracker-crumb-title');
     const versionBtn = document.getElementById('version-btn');
     const closeChangelogBtn = document.getElementById('close-changelog-btn');
     const libraryCountBadge = document.getElementById('library-count-badge');
     const libraryHeaderCount = document.getElementById('library-header-count');
     const recCountBadge = document.getElementById('rec-count-badge');
+
+    let currentTrackerShow = null;
+    let currentTrackerSeason = 1;
 
     const authBtn = document.getElementById('auth-btn');
     const authStatusBadge = document.getElementById('auth-status-badge');
@@ -821,6 +829,10 @@ document.addEventListener('DOMContentLoaded', () => {
             viewChangelog.classList.toggle('active', viewName === 'changelog');
             viewChangelog.style.display = viewName === 'changelog' ? 'block' : 'none';
         }
+        if (viewShowTracker) {
+            viewShowTracker.classList.toggle('active', viewName === 'show-tracker');
+            viewShowTracker.style.display = viewName === 'show-tracker' ? 'block' : 'none';
+        }
 
         if (viewName === 'library') {
             renderContinueWatching();
@@ -828,7 +840,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (viewName === 'recommendations') {
             renderSmartRecommendationsView();
         } else if (viewName === 'explore') {
-            if (targetService) {
+            if (targetService && typeof targetService === 'string') {
                 currentExploreService = targetService;
                 if (exploreServiceFilters) {
                     exploreServiceFilters.querySelectorAll('.pill-btn').forEach(btn => {
@@ -840,6 +852,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             renderServiceDiscovery(currentExploreService);
+        } else if (viewName === 'show-tracker') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            if (targetService) {
+                renderShowTracker(targetService);
+            }
         } else if (viewName === 'changelog') {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -860,40 +877,650 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- Show Watch Data & Season/Episode Tracker ---
+    function getShowWatchData(showId) {
+        const idStr = String(showId || '');
+        const uuid = window.db?.toDeterministicUuid ? window.db.toDeterministicUuid(idStr) : idStr;
+        const found = userWatchlist.find(w => 
+            String(w.content_item_id) === idStr || 
+            String(w.content_item_id) === uuid
+        );
+        return found || {
+            status: 'none',
+            rating: null,
+            episodes_watched: {},
+            completed_seasons: [],
+            archived: false,
+            watched_count: 0,
+            total_episodes: 0
+        };
+    }
+
+    const showSeasonsCache = {};
+    const seasonEpisodesCache = {};
+
+    async function getTmdbKey() {
+        return (await window.db.getSystemSetting('tmdb_api_key')) || localStorage.getItem('tmdb_api_key') || '';
+    }
+
+    async function fetchShowSeasonsData(showItem) {
+        const showId = String(showItem.id);
+        const tmdbId = String(showItem.tmdb_id || showItem.id || '');
+        if (showSeasonsCache[showId]) return showSeasonsCache[showId];
+
+        const key = await getTmdbKey();
+        let details = null;
+        let seasons = [];
+
+        if (key && tmdbId && !tmdbId.startsWith('custom_')) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000);
+                const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${key}&append_to_response=external_ids,credits`, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (res.ok) {
+                    details = await res.json();
+                    if (Array.isArray(details.seasons) && details.seasons.length > 0) {
+                        const regular = details.seasons.filter(s => s.season_number > 0).sort((a, b) => a.season_number - b.season_number);
+                        const specials = details.seasons.filter(s => s.season_number === 0 && s.episode_count > 0);
+                        seasons = [...regular, ...specials];
+                    }
+                }
+            } catch (err) {
+                console.warn("fetchShowSeasonsData error:", err);
+            }
+        }
+
+        if (!seasons || seasons.length === 0) {
+            seasons = [
+                {
+                    season_number: 1,
+                    name: 'Season 1',
+                    episode_count: showItem.episode_count || 8,
+                    air_date: showItem.release_year ? `${showItem.release_year}-01-01` : ''
+                }
+            ];
+        }
+
+        const result = { details, seasons };
+        showSeasonsCache[showId] = result;
+        return result;
+    }
+
+    async function fetchSeasonEpisodesData(showItem, seasonNumber) {
+        const showId = String(showItem.id);
+        const tmdbId = String(showItem.tmdb_id || showItem.id || '');
+        const cacheKey = `${showId}_s${seasonNumber}`;
+        if (seasonEpisodesCache[cacheKey]) return seasonEpisodesCache[cacheKey];
+
+        const key = await getTmdbKey();
+        let episodes = [];
+
+        if (key && tmdbId && !tmdbId.startsWith('custom_')) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000);
+                const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/season/${seasonNumber}?api_key=${key}`, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data.episodes) && data.episodes.length > 0) {
+                        episodes = data.episodes.map(ep => ({
+                            episode_number: ep.episode_number,
+                            season_number: seasonNumber,
+                            name: ep.name || `Episode ${ep.episode_number}`,
+                            overview: ep.overview || 'No episode synopsis available.',
+                            air_date: ep.air_date || '',
+                            runtime: ep.runtime || null,
+                            still_path: ep.still_path ? `https://image.tmdb.org/t/p/w500${ep.still_path}` : null,
+                            vote_average: ep.vote_average ? Math.round(ep.vote_average * 10) / 10 : null
+                        }));
+                    }
+                }
+            } catch (err) {
+                console.warn("fetchSeasonEpisodesData error:", err);
+            }
+        }
+
+        if (episodes.length === 0) {
+            const count = 8;
+            for (let i = 1; i <= count; i++) {
+                episodes.push({
+                    episode_number: i,
+                    season_number: seasonNumber,
+                    name: `Episode ${i}`,
+                    overview: `Episode ${i} of ${showItem.title}.`,
+                    air_date: '',
+                    runtime: 45,
+                    still_path: null,
+                    vote_average: null
+                });
+            }
+        }
+
+        seasonEpisodesCache[cacheKey] = episodes;
+        return episodes;
+    }
+
+    async function toggleEpisodeWatched(showItem, seasonNumber, episodeNumber, currentSeasonEpisodes, allSeasons) {
+        const idStr = String(showItem.id);
+        const watchData = getShowWatchData(showItem.id);
+        const watchedMap = { ...(watchData.episodes_watched || {}) };
+        const epKey = `s${seasonNumber}_e${episodeNumber}`;
+
+        const isNowWatched = !watchedMap[epKey];
+        if (isNowWatched) {
+            watchedMap[epKey] = true;
+        } else {
+            delete watchedMap[epKey];
+        }
+
+        const completedSeasons = Array.isArray(watchData.completed_seasons) ? [...watchData.completed_seasons] : [];
+        const seasonEpisodesCount = currentSeasonEpisodes.length;
+        let seasonWatchedCount = 0;
+        currentSeasonEpisodes.forEach(ep => {
+            if (watchedMap[`s${seasonNumber}_e${ep.episode_number}`]) seasonWatchedCount++;
+        });
+
+        const seasonIdx = completedSeasons.indexOf(seasonNumber);
+        if (seasonWatchedCount === seasonEpisodesCount && seasonEpisodesCount > 0) {
+            if (seasonIdx === -1) completedSeasons.push(seasonNumber);
+        } else {
+            if (seasonIdx >= 0) completedSeasons.splice(seasonIdx, 1);
+        }
+
+        let totalSeriesEpisodes = 0;
+        (allSeasons || []).forEach(s => { totalSeriesEpisodes += (s.episode_count || 0); });
+        if (totalSeriesEpisodes === 0) totalSeriesEpisodes = currentSeasonEpisodes.length;
+        const watchedCount = Object.keys(watchedMap).filter(k => watchedMap[k]).length;
+
+        let newStatus = watchData.status;
+        let isArchived = Boolean(watchData.archived);
+
+        if (isNowWatched && (newStatus === 'none' || newStatus === 'want_to_watch')) {
+            newStatus = 'watching';
+        }
+
+        const uuid = window.db?.toDeterministicUuid ? window.db.toDeterministicUuid(idStr) : idStr;
+        const existingIdx = userWatchlist.findIndex(w => String(w.content_item_id) === idStr || String(w.content_item_id) === uuid);
+        const updatedEntry = {
+            content_item_id: uuid,
+            status: newStatus,
+            rating: watchData.rating || null,
+            episodes_watched: watchedMap,
+            completed_seasons: completedSeasons,
+            archived: isArchived,
+            watched_count: watchedCount,
+            total_episodes: totalSeriesEpisodes,
+            updated_at: new Date().toISOString()
+        };
+
+        if (existingIdx >= 0) {
+            userWatchlist[existingIdx] = { ...userWatchlist[existingIdx], ...updatedEntry };
+        } else {
+            userWatchlist.push(updatedEntry);
+        }
+
+        await window.db.upsertWatchlistItem(currentUser?.id || null, idStr, newStatus, watchData.rating || null, {
+            episodes_watched: watchedMap,
+            completed_seasons: completedSeasons,
+            archived: isArchived,
+            watched_count: watchedCount,
+            total_episodes: totalSeriesEpisodes
+        });
+
+        renderShowTracker(showItem, seasonNumber);
+        updateLibraryCounters();
+    }
+
+    async function toggleSeasonWatched(showItem, seasonNumber, currentSeasonEpisodes, markAsWatched) {
+        const idStr = String(showItem.id);
+        const watchData = getShowWatchData(showItem.id);
+        const watchedMap = { ...(watchData.episodes_watched || {}) };
+        const completedSeasons = Array.isArray(watchData.completed_seasons) ? [...watchData.completed_seasons] : [];
+
+        currentSeasonEpisodes.forEach(ep => {
+            const epKey = `s${seasonNumber}_e${ep.episode_number}`;
+            if (markAsWatched) {
+                watchedMap[epKey] = true;
+            } else {
+                delete watchedMap[epKey];
+            }
+        });
+
+        const seasonIdx = completedSeasons.indexOf(seasonNumber);
+        if (markAsWatched) {
+            if (seasonIdx === -1) completedSeasons.push(seasonNumber);
+        } else {
+            if (seasonIdx >= 0) completedSeasons.splice(seasonIdx, 1);
+        }
+
+        let newStatus = watchData.status;
+        if (markAsWatched && (newStatus === 'none' || newStatus === 'want_to_watch')) {
+            newStatus = 'watching';
+        }
+
+        const watchedCount = Object.keys(watchedMap).filter(k => watchedMap[k]).length;
+        const uuid = window.db?.toDeterministicUuid ? window.db.toDeterministicUuid(idStr) : idStr;
+        const existingIdx = userWatchlist.findIndex(w => String(w.content_item_id) === idStr || String(w.content_item_id) === uuid);
+        const updatedEntry = {
+            content_item_id: uuid,
+            status: newStatus,
+            rating: watchData.rating || null,
+            episodes_watched: watchedMap,
+            completed_seasons: completedSeasons,
+            archived: Boolean(watchData.archived),
+            watched_count: watchedCount,
+            total_episodes: watchData.total_episodes || (currentSeasonEpisodes.length || 8),
+            updated_at: new Date().toISOString()
+        };
+
+        if (existingIdx >= 0) {
+            userWatchlist[existingIdx] = { ...userWatchlist[existingIdx], ...updatedEntry };
+        } else {
+            userWatchlist.push(updatedEntry);
+        }
+
+        await window.db.upsertWatchlistItem(currentUser?.id || null, idStr, newStatus, watchData.rating || null, {
+            episodes_watched: watchedMap,
+            completed_seasons: completedSeasons,
+            archived: Boolean(watchData.archived),
+            watched_count: watchedCount,
+            total_episodes: updatedEntry.total_episodes
+        });
+
+        showToast(markAsWatched ? `✓ Season ${seasonNumber} marked complete!` : `Season ${seasonNumber} unchecked.`, 'info');
+        renderShowTracker(showItem, seasonNumber);
+        updateLibraryCounters();
+    }
+
+    async function markSeriesCompleteAndArchive(showItem, allSeasons) {
+        const idStr = String(showItem.id);
+        const watchData = getShowWatchData(showItem.id);
+        const watchedMap = { ...(watchData.episodes_watched || {}) };
+        const completedSeasons = (allSeasons || []).map(s => s.season_number);
+
+        for (const s of (allSeasons || [])) {
+            const count = s.episode_count || 8;
+            for (let i = 1; i <= count; i++) {
+                watchedMap[`s${s.season_number}_e${i}`] = true;
+            }
+        }
+
+        const watchedCount = Object.keys(watchedMap).filter(k => watchedMap[k]).length;
+        const uuid = window.db?.toDeterministicUuid ? window.db.toDeterministicUuid(idStr) : idStr;
+        const existingIdx = userWatchlist.findIndex(w => String(w.content_item_id) === idStr || String(w.content_item_id) === uuid);
+        
+        const updatedEntry = {
+            content_item_id: uuid,
+            status: 'completed',
+            rating: watchData.rating || null,
+            episodes_watched: watchedMap,
+            completed_seasons: completedSeasons,
+            archived: true,
+            watched_count: watchedCount,
+            total_episodes: watchedCount,
+            updated_at: new Date().toISOString()
+        };
+
+        if (existingIdx >= 0) {
+            userWatchlist[existingIdx] = { ...userWatchlist[existingIdx], ...updatedEntry };
+        } else {
+            userWatchlist.push(updatedEntry);
+        }
+
+        await window.db.upsertWatchlistItem(currentUser?.id || null, idStr, 'completed', watchData.rating || null, {
+            episodes_watched: watchedMap,
+            completed_seasons: completedSeasons,
+            archived: true,
+            watched_count: watchedCount,
+            total_episodes: watchedCount
+        });
+
+        showToast(`✓ "${showItem.title}" marked complete & moved to Archive!`, 'success', 3500);
+        renderShowTracker(showItem, currentTrackerSeason);
+        updateLibraryCounters();
+    }
+
+    async function reopenSeries(showItem) {
+        const idStr = String(showItem.id);
+        const watchData = getShowWatchData(showItem.id);
+        const uuid = window.db?.toDeterministicUuid ? window.db.toDeterministicUuid(idStr) : idStr;
+        const existingIdx = userWatchlist.findIndex(w => String(w.content_item_id) === idStr || String(w.content_item_id) === uuid);
+
+        const updatedEntry = {
+            content_item_id: uuid,
+            status: 'watching',
+            rating: watchData.rating || null,
+            episodes_watched: watchData.episodes_watched || {},
+            completed_seasons: watchData.completed_seasons || [],
+            archived: false,
+            watched_count: watchData.watched_count || 0,
+            total_episodes: watchData.total_episodes || 0,
+            updated_at: new Date().toISOString()
+        };
+
+        if (existingIdx >= 0) {
+            userWatchlist[existingIdx] = { ...userWatchlist[existingIdx], ...updatedEntry };
+        } else {
+            userWatchlist.push(updatedEntry);
+        }
+
+        await window.db.upsertWatchlistItem(currentUser?.id || null, idStr, 'watching', watchData.rating || null, {
+            episodes_watched: watchData.episodes_watched || {},
+            completed_seasons: watchData.completed_seasons || [],
+            archived: false,
+            watched_count: watchData.watched_count || 0,
+            total_episodes: watchData.total_episodes || 0
+        });
+
+        showToast(`"${showItem.title}" reopened and moved to Watching.`, 'info');
+        renderShowTracker(showItem, currentTrackerSeason);
+        updateLibraryCounters();
+    }
+
+    async function renderShowTracker(showItem, requestedSeason = null) {
+        if (!showTrackerContent) return;
+        currentTrackerShow = showItem;
+
+        if (trackerCrumbTitle) {
+            trackerCrumbTitle.textContent = showItem.title || 'Show Tracker';
+        }
+
+        showTrackerContent.innerHTML = `
+            <div style="padding: 60px 20px; text-align: center;">
+                <div class="skeleton-loader" style="width: 180px; height: 36px; margin: 0 auto 16px auto; border-radius: 8px;"></div>
+                <h3 style="font-size: 1.4rem; margin-bottom: 8px;">Loading Seasons for ${showItem.title}...</h3>
+                <p style="color: var(--text-muted); font-size: 0.95rem;">Retrieving official episode guides, runtimes, and season progress...</p>
+                <div class="skeleton-loader" style="width: 70%; max-width: 600px; height: 16px; margin: 25px auto 10px auto; border-radius: 4px;"></div>
+            </div>
+        `;
+
+        const { details, seasons } = await fetchShowSeasonsData(showItem);
+
+        let activeSeasonNum = requestedSeason;
+        if (activeSeasonNum === null) {
+            const watchData = getShowWatchData(showItem.id);
+            const compSeasons = watchData.completed_seasons || [];
+            const uncompletedSeason = seasons.find(s => !compSeasons.includes(s.season_number));
+            activeSeasonNum = uncompletedSeason ? uncompletedSeason.season_number : (seasons[0]?.season_number || 1);
+        }
+        currentTrackerSeason = activeSeasonNum;
+
+        const currentEpisodes = await fetchSeasonEpisodesData(showItem, activeSeasonNum);
+
+        const watchData = getShowWatchData(showItem.id);
+        const watchedMap = watchData.episodes_watched || {};
+        
+        let totalSeriesEpisodes = 0;
+        seasons.forEach(s => {
+            totalSeriesEpisodes += (s.episode_count || 0);
+        });
+        if (totalSeriesEpisodes === 0) {
+            totalSeriesEpisodes = seasons.length * (currentEpisodes.length || 8);
+        }
+
+        let watchedCount = 0;
+        Object.keys(watchedMap).forEach(key => {
+            if (watchedMap[key]) watchedCount++;
+        });
+
+        const safeTotal = Math.max(totalSeriesEpisodes, watchedCount, 1);
+        const percent = Math.min(100, Math.round((watchedCount / safeTotal) * 100));
+
+        let seasonWatchedCount = 0;
+        currentEpisodes.forEach(ep => {
+            const epKey = `s${activeSeasonNum}_e${ep.episode_number}`;
+            if (watchedMap[epKey]) seasonWatchedCount++;
+        });
+        const isSeasonAllWatched = currentEpisodes.length > 0 && seasonWatchedCount === currentEpisodes.length;
+        const isSeriesComplete = watchData.status === 'completed' || watchData.archived;
+
+        const serviceName = resolveItemServiceName(showItem);
+        const posterImg = showItem.poster_url || (details?.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(showItem.title));
+        const backdropImg = details?.backdrop_path ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}` : '';
+        const ratingVal = details?.vote_average ? (Math.round(details.vote_average * 10) / 10) : 8.2;
+        const yearVal = showItem.release_year || (details?.first_air_date ? details.first_air_date.split('-')[0] : 'N/A');
+        const overview = details?.overview || showItem.overview || 'Track your season and episode progress below. Check off episodes as you watch them.';
+
+        showTrackerContent.innerHTML = `
+            <div class="tracker-hero" style="${backdropImg ? `background-image: url('${backdropImg}');` : 'background: #0f1424;'}">
+                <div class="tracker-hero-overlay"></div>
+                <div class="tracker-hero-content">
+                    <img src="${posterImg}" class="tracker-poster-thumb" alt="${showItem.title.replace(/"/g, '&quot;')}" onerror="this.onerror=null;this.src='https://via.placeholder.com/300x450?text=No+Poster';">
+                    <div class="tracker-hero-meta">
+                        <div class="tracker-title-row">
+                            <h2 class="tracker-show-title">${showItem.title}</h2>
+                            ${isSeriesComplete ? '<span class="badge-archived">📦 Series Archived</span>' : '<span class="badge-watching">🎬 In Library</span>'}
+                        </div>
+                        <div class="tracker-meta-tags">
+                            <span class="tracker-service-pill">${serviceName}</span>
+                            <span class="tracker-meta-pill">${yearVal}</span>
+                            <span class="tracker-meta-pill">${seasons.length} Season${seasons.length === 1 ? '' : 's'}</span>
+                            <span class="tracker-meta-pill rating-gold">★ ${ratingVal}</span>
+                        </div>
+                        <p class="tracker-overview">${overview}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tracker-progress-card">
+                <div class="tracker-progress-header">
+                    <div>
+                        <div class="tracker-progress-title">
+                            <h3>Overall Series Progress</h3>
+                            <span class="tracker-progress-badge">${watchedCount} of ${safeTotal} Episodes Watched (${percent}%)</span>
+                        </div>
+                        <p class="tracker-progress-sub">Check off episodes as you finish them. When you are done with a season or the entire series, mark it complete to move it into your library archive.</p>
+                    </div>
+                    <div class="tracker-series-actions">
+                        ${isSeriesComplete 
+                            ? `<button type="button" class="btn secondary-btn btn-toggle-series-archive" id="btn-toggle-series-archive" data-action="unarchive">
+                                  <span>↺</span> Reopen Series (Move to Watching)
+                               </button>`
+                            : `<button type="button" class="btn primary-btn btn-toggle-series-archive" id="btn-toggle-series-archive" data-action="archive">
+                                  <span>📦</span> Mark Series Complete &amp; Move to Archive
+                               </button>`
+                        }
+                        <div class="tracker-rating-bar">
+                            <span style="font-size: 0.85rem; color: var(--text-muted);">Rating:</span>
+                            <button class="rating-btn up ${watchData.rating === 'thumbs_up' ? 'active' : ''}" id="tracker-thumbs-up" data-id="${showItem.id}" title="Thumbs Up">👍</button>
+                            <button class="rating-btn down ${watchData.rating === 'thumbs_down' ? 'active' : ''}" id="tracker-thumbs-down" data-id="${showItem.id}" title="Thumbs Down">👎</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="tracker-bar-container">
+                    <div class="tracker-bar-fill" style="width: ${percent}%;"></div>
+                </div>
+            </div>
+
+            <div class="tracker-seasons-bar">
+                <div class="tracker-season-tabs" id="tracker-season-tabs">
+                    ${seasons.map(s => {
+                        const isSelected = s.season_number === activeSeasonNum;
+                        const isSeasonDone = (watchData.completed_seasons || []).includes(s.season_number);
+                        return `
+                            <button type="button" class="season-tab-btn ${isSelected ? 'active' : ''} ${isSeasonDone ? 'season-done' : ''}" data-season="${s.season_number}">
+                                ${s.name || `Season ${s.season_number}`}
+                                <span class="season-tab-count">${s.episode_count ? `(${s.episode_count} eps)` : ''}</span>
+                                ${isSeasonDone ? '<span class="season-check-icon">✓</span>' : ''}
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+                <div class="tracker-season-action-btn-wrap">
+                    <button type="button" class="btn secondary-btn" id="btn-toggle-season-complete" data-season="${activeSeasonNum}" data-allwatched="${isSeasonAllWatched}">
+                        ${isSeasonAllWatched ? `<span>↺</span> Uncheck Season ${activeSeasonNum}` : `<span>✓</span> Mark Season ${activeSeasonNum} Complete`}
+                    </button>
+                </div>
+            </div>
+
+            <div class="tracker-episodes-header">
+                <h3 style="margin: 0; font-size: 1.25rem;">
+                    Season ${activeSeasonNum} Episodes 
+                    <span style="font-size: 0.9rem; color: var(--text-muted); font-weight: normal;">(${seasonWatchedCount}/${currentEpisodes.length} watched)</span>
+                </h3>
+            </div>
+
+            <div class="tracker-episodes-list" id="tracker-episodes-list">
+                ${currentEpisodes.map(ep => {
+                    const epKey = `s${activeSeasonNum}_e${ep.episode_number}`;
+                    const isWatched = Boolean(watchedMap[epKey]);
+                    const still = ep.still_path || posterImg;
+                    const runtimeStr = ep.runtime ? `${ep.runtime} min` : '';
+                    const airDateStr = ep.air_date ? new Date(ep.air_date + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+
+                    return `
+                        <div class="episode-card ${isWatched ? 'is-watched' : ''}" id="ep-card-${activeSeasonNum}-${ep.episode_number}">
+                            <div class="episode-still-col">
+                                <div class="episode-still-img" style="background-image: url('${still}')">
+                                    ${runtimeStr ? `<span class="episode-runtime-pill">${runtimeStr}</span>` : ''}
+                                    ${isWatched ? '<span class="episode-watched-badge">✓ Watched</span>' : ''}
+                                </div>
+                            </div>
+                            <div class="episode-info-col">
+                                <div class="episode-header-line">
+                                    <h4 class="episode-title">
+                                        <span class="ep-num-pill">E${ep.episode_number}</span>
+                                        ${ep.name}
+                                    </h4>
+                                    ${ep.vote_average ? `<span class="ep-rating-pill">★ ${ep.vote_average}</span>` : ''}
+                                </div>
+                                <div class="episode-sub-meta">
+                                    ${airDateStr ? `<span>Aired: ${airDateStr}</span>` : ''}
+                                </div>
+                                <p class="episode-overview">${ep.overview}</p>
+                            </div>
+                            <div class="episode-action-col">
+                                <button type="button" class="btn-episode-toggle ${isWatched ? 'is-watched' : ''}" 
+                                    data-season="${activeSeasonNum}" 
+                                    data-episode="${ep.episode_number}"
+                                    aria-label="Toggle watched status for Episode ${ep.episode_number}">
+                                    ${isWatched ? '<span>✓</span> Watched' : '<span>○</span> Mark Watched'}
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+
+        const seasonTabs = showTrackerContent.querySelectorAll('.season-tab-btn');
+        seasonTabs.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const sNum = parseInt(btn.dataset.season, 10);
+                renderShowTracker(showItem, sNum);
+            });
+        });
+
+        const seasonToggleBtn = showTrackerContent.querySelector('#btn-toggle-season-complete');
+        if (seasonToggleBtn) {
+            seasonToggleBtn.addEventListener('click', async () => {
+                const sNum = parseInt(seasonToggleBtn.dataset.season, 10);
+                const allWatched = seasonToggleBtn.dataset.allwatched === 'true';
+                await toggleSeasonWatched(showItem, sNum, currentEpisodes, !allWatched);
+            });
+        }
+
+        const seriesArchiveBtn = showTrackerContent.querySelector('#btn-toggle-series-archive');
+        if (seriesArchiveBtn) {
+            seriesArchiveBtn.addEventListener('click', async () => {
+                const action = seriesArchiveBtn.dataset.action;
+                if (action === 'archive') {
+                    await markSeriesCompleteAndArchive(showItem, seasons);
+                } else {
+                    await reopenSeries(showItem);
+                }
+            });
+        }
+
+        const thumbUp = showTrackerContent.querySelector('#tracker-thumbs-up');
+        const thumbDown = showTrackerContent.querySelector('#tracker-thumbs-down');
+        if (thumbUp) {
+            thumbUp.addEventListener('click', async () => {
+                const current = watchData.rating === 'thumbs_up' ? null : 'thumbs_up';
+                await updateWatchState(showItem.id, watchData.status === 'none' ? 'watching' : watchData.status, current);
+                renderShowTracker(showItem, activeSeasonNum);
+            });
+        }
+        if (thumbDown) {
+            thumbDown.addEventListener('click', async () => {
+                const current = watchData.rating === 'thumbs_down' ? null : 'thumbs_down';
+                await updateWatchState(showItem.id, watchData.status === 'none' ? 'watching' : watchData.status, current);
+                renderShowTracker(showItem, activeSeasonNum);
+            });
+        }
+
+        const epToggles = showTrackerContent.querySelectorAll('.btn-episode-toggle');
+        epToggles.forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const sNum = parseInt(btn.dataset.season, 10);
+                const epNum = parseInt(btn.dataset.episode, 10);
+                await toggleEpisodeWatched(showItem, sNum, epNum, currentEpisodes, seasons);
+            });
+        });
+    }
+
     function createCardHTML(item, isRecommendation = false) {
-        const watchData = userWatchlist.find(w => w.content_item_id === item.id) || { status: 'none', rating: null };
+        const watchData = getShowWatchData(item.id);
         const status = watchData.status;
         const rating = watchData.rating;
+        const isArchived = Boolean(watchData.archived || status === 'completed');
         
         const serviceName = resolveItemServiceName(item);
         const year = item.release_year || 'N/A';
         const poster = item.poster_url || 'https://via.placeholder.com/300x450?text=' + encodeURIComponent(item.title);
         
-        let opacityClass = status === 'completed' ? 'completed' : (status === 'dropped' ? 'dropped' : '');
+        let opacityClass = isArchived ? 'completed is-archived' : (status === 'dropped' ? 'dropped' : '');
 
         let cardHtml = `
             <div class="content-card ${opacityClass}">
-                <div class="card-poster" style="background-image: url('${poster}')">
+                <div class="card-poster" style="background-image: url('${poster}')" data-id="${item.id}" title="Click to track episodes for ${item.title.replace(/"/g, '&quot;')}">
                     <span class="card-service-badge" style="text-transform: capitalize;">${serviceName}</span>
+                    ${isArchived ? '<span class="card-archive-badge">📦 Archived</span>' : ''}
                 </div>
                 <div class="card-info">
-                    <div class="card-title">${item.title}</div>
+                    <div class="card-title" data-id="${item.id}" title="Click to track episodes for ${item.title.replace(/"/g, '&quot;')}">${item.title}</div>
                     <div class="card-meta">${year}</div>
         `;
 
         if (!isRecommendation) {
+            let progressHtml = '';
+            const watchedCnt = watchData.watched_count !== undefined 
+                ? watchData.watched_count 
+                : Object.keys(watchData.episodes_watched || {}).filter(k => watchData.episodes_watched[k]).length;
+            const totalCnt = watchData.total_episodes || (watchData.completed_seasons?.length ? watchData.completed_seasons.length * 8 : (watchedCnt > 0 ? Math.max(watchedCnt, 8) : 0));
+            if (watchedCnt > 0 || totalCnt > 0) {
+                const epPercent = Math.min(100, Math.round((watchedCnt / Math.max(totalCnt, 1)) * 100));
+                progressHtml = `
+                    <div class="card-progress-bar-wrap" title="${watchedCnt} of ${totalCnt || watchedCnt} episodes watched">
+                        <div class="card-progress-label">
+                            <span>${watchedCnt}/${totalCnt || watchedCnt} eps</span>
+                            <span>${epPercent}%</span>
+                        </div>
+                        <div class="card-progress-track">
+                            <div class="card-progress-fill" style="width: ${epPercent}%"></div>
+                        </div>
+                    </div>
+                `;
+            }
+
             cardHtml += `
+                    ${progressHtml}
                     <div class="card-actions" style="flex-direction: column; gap: 0.5rem; align-items: stretch;">
+                        <button type="button" class="btn secondary-btn btn-track-card" data-id="${item.id}" style="width: 100%; font-size: 0.82rem; padding: 6px 10px; display: inline-flex; align-items: center; justify-content: center; gap: 5px;">
+                            <span>📋</span> Track Episodes &amp; Seasons
+                        </button>
                         <select class="status-dropdown" data-id="${item.id}">
                             <option value="none" ${status === 'none' ? 'selected' : ''}>+ Add to List</option>
                             <option value="want_to_watch" ${status === 'want_to_watch' ? 'selected' : ''}>Want to Watch</option>
-                            <option value="watching" ${status === 'watching' ? 'selected' : ''}>Watching</option>
-                            <option value="completed" ${status === 'completed' ? 'selected' : ''}>Completed</option>
+                            <option value="watching" ${status === 'watching' && !isArchived ? 'selected' : ''}>Watching</option>
+                            <option value="completed" ${isArchived ? 'selected' : ''}>📦 Archive / Completed</option>
                             <option value="dropped" ${status === 'dropped' ? 'selected' : ''}>Not Interested</option>
                         </select>
             `;
             
-            if (status === 'completed') {
+            if (isArchived || status === 'completed') {
                 cardHtml += `
                         <div class="rating-bar">
                             <button class="rating-btn up ${rating === 'thumbs_up' ? 'active' : ''}" data-id="${item.id}" data-val="thumbs_up" title="Thumbs Up">👍</button>
@@ -949,9 +1576,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Status Filter
                 if (currentStatusFilter !== 'all') {
                     const idStr = String(item.id);
-                    const tmdbIdStr = String(item.tmdb_id || item.id);
-                    const watchData = userWatchlist.find(w => String(w.content_item_id) === idStr || String(w.content_item_id) === tmdbIdStr) || { status: 'none' };
-                    if (watchData.status !== currentStatusFilter) return false;
+                    const watchData = getShowWatchData(idStr);
+                    const isArchived = Boolean(watchData.archived || watchData.status === 'completed');
+                    
+                    if (currentStatusFilter === 'completed') {
+                        if (!isArchived) return false;
+                    } else if (currentStatusFilter === 'watching') {
+                        if (watchData.status !== 'watching' || isArchived) return false;
+                    } else if (currentStatusFilter === 'want_to_watch') {
+                        if (watchData.status !== 'want_to_watch' || isArchived) return false;
+                    } else {
+                        if (watchData.status !== currentStatusFilter) return false;
+                    }
                 }
 
                 // Provider Filter within Personal Library
@@ -1000,11 +1636,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 `;
             } else if (currentStatusFilter !== 'all') {
-                const statusNames = { watching: 'Currently Watching', want_to_watch: 'Want to Watch', completed: 'Completed' };
+                const statusNames = { watching: 'Currently Watching', want_to_watch: 'Want to Watch', completed: 'Archive' };
                 const stName = statusNames[currentStatusFilter] || currentStatusFilter;
+                const extraTip = currentStatusFilter === 'completed' 
+                    ? '<p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 6px;">When you finish a season or series, mark it complete to move it into your archive.</p>' 
+                    : '';
                 catalogGrid.innerHTML = `
                     <div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px dashed var(--border-subtle);">
-                        <p style="color: var(--text-muted); font-size: 1.05rem;">You have 0 shows marked as <strong>${stName}</strong>.</p>
+                        <p style="color: var(--text-muted); font-size: 1.05rem;">You have 0 shows in <strong>${stName}</strong>.</p>
+                        ${extraTip}
                         <button class="btn secondary-btn" style="margin-top: 15px;" onclick="resetLibraryFilters()">View All Library Shows</button>
                     </div>
                 `;
@@ -1056,9 +1696,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateLibraryCounters() {
         const total = allContent.length;
-        const watching = userWatchlist.filter(w => w.status === 'watching').length;
-        const want = userWatchlist.filter(w => w.status === 'want_to_watch').length;
-        const completed = userWatchlist.filter(w => w.status === 'completed').length;
+        const watching = allContent.filter(c => {
+            const w = getShowWatchData(c.id);
+            return w.status === 'watching' && !w.archived;
+        }).length;
+        const want = allContent.filter(c => {
+            const w = getShowWatchData(c.id);
+            return w.status === 'want_to_watch' && !w.archived;
+        }).length;
+        const completed = allContent.filter(c => {
+            const w = getShowWatchData(c.id);
+            return w.status === 'completed' || w.archived;
+        }).length;
 
         if (libraryCountBadge) libraryCountBadge.textContent = total;
         if (libraryHeaderCount) libraryHeaderCount.textContent = `(${total} show${total === 1 ? '' : 's'})`;
@@ -1091,7 +1740,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optAll) optAll.textContent = `All Shows (${total})`;
             if (optWatch) optWatch.textContent = `Watching (${watching})`;
             if (optWant) optWant.textContent = `Want to Watch (${want})`;
-            if (optComp) optComp.textContent = `Completed (${completed})`;
+            if (optComp) optComp.textContent = `📦 Archive (${completed})`;
         }
         if (mobileServiceSelect) {
             ['netflix', 'disney', 'hulu', 'peacock', 'prime', 'youtube', 'appletv'].forEach(svc => {
@@ -1111,8 +1760,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderContinueWatching() {
-        const watchingIds = userWatchlist.filter(w => w.status === 'watching').map(w => w.content_item_id);
-        const watchingContent = allContent.filter(c => watchingIds.includes(c.id));
+        const watchingContent = allContent.filter(c => {
+            const w = getShowWatchData(c.id);
+            return w.status === 'watching' && !w.archived;
+        });
         
         if (watchingContent.length > 0) {
             continueWatchingContainer.style.display = 'block';
@@ -2002,18 +2653,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const watchData = userWatchlist.find(w => String(w.content_item_id) === idStr || String(w.content_item_id) === tmdbIdStr) || { status: 'none', rating: null };
             
             let weight = 1.0;
-            if (watchData.status === 'completed' && watchData.rating === 'thumbs_up') {
-                weight = 4.0;
+            const isFinishedOrArchived = watchData.status === 'completed' || Boolean(watchData.archived);
+            if (isFinishedOrArchived && watchData.rating === 'thumbs_up') {
+                weight = 4.5;
                 likedCount++;
                 positiveSeeds.push(item);
+            } else if (isFinishedOrArchived) {
+                // Completed & archived series are high-affinity recommendation drivers!
+                weight = 3.5;
+                if (watchData.rating !== 'thumbs_down') {
+                    positiveSeeds.push(item);
+                }
             } else if (watchData.status === 'watching') {
                 weight = 3.0;
                 watchingCount++;
                 positiveSeeds.push(item);
             } else if (watchData.status === 'want_to_watch') {
                 weight = 1.8;
-            } else if (watchData.status === 'completed') {
-                weight = 1.2;
             } else if (watchData.status === 'dropped' || watchData.rating === 'thumbs_down') {
                 weight = -4.0;
             }
@@ -2473,22 +3129,43 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Actions ---
-    async function updateWatchState(itemId, status, rating = null) {
+    async function updateWatchState(itemId, status, rating = null, extraFields = {}) {
         const idStr = String(itemId);
-        const existing = userWatchlist.find(w => String(w.content_item_id) === idStr);
+        const uuid = window.db?.toDeterministicUuid ? window.db.toDeterministicUuid(idStr) : idStr;
+        const existing = userWatchlist.find(w => String(w.content_item_id) === idStr || String(w.content_item_id) === uuid);
+        const isArchived = extraFields.archived !== undefined ? extraFields.archived : (status === 'completed' ? true : (existing?.archived || false));
+
+        const updatedEntry = {
+            content_item_id: uuid,
+            status,
+            rating: rating !== null ? rating : (existing?.rating || null),
+            episodes_watched: extraFields.episodes_watched !== undefined ? extraFields.episodes_watched : (existing?.episodes_watched || {}),
+            completed_seasons: extraFields.completed_seasons !== undefined ? extraFields.completed_seasons : (existing?.completed_seasons || []),
+            archived: isArchived,
+            watched_count: extraFields.watched_count !== undefined ? extraFields.watched_count : (existing?.watched_count || 0),
+            total_episodes: extraFields.total_episodes !== undefined ? extraFields.total_episodes : (existing?.total_episodes || 0),
+            updated_at: new Date().toISOString()
+        };
+
         if (existing) {
-            existing.status = status;
-            if (rating !== null) existing.rating = rating;
+            Object.assign(existing, updatedEntry);
         } else {
-            userWatchlist.push({ content_item_id: idStr, status, rating });
+            userWatchlist.push(updatedEntry);
         }
 
         renderAllSections();
-        await window.db.upsertWatchlistItem(currentUser?.id || null, idStr, status, rating);
+        await window.db.upsertWatchlistItem(currentUser?.id || null, idStr, status, rating, updatedEntry);
     }
 
     // --- Event Listeners ---
     function setupEventListeners() {
+        if (trackerBackBtn) {
+            trackerBackBtn.addEventListener('click', () => switchView('library'));
+        }
+        if (crumbLibraryLink) {
+            crumbLibraryLink.addEventListener('click', () => switchView('library'));
+        }
+
         // Global Grid Change Listener for Status Dropdown
         document.body.addEventListener('change', (e) => {
             if (e.target.classList.contains('status-dropdown')) {
@@ -2496,11 +3173,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 const status = e.target.value;
                 const existing = userWatchlist.find(w => String(w.content_item_id) === String(itemId));
                 const currentRating = status === 'completed' ? (existing?.rating || null) : null;
-                updateWatchState(itemId, status, currentRating);
+                const isArchived = status === 'completed';
+                updateWatchState(itemId, status, currentRating, { archived: isArchived });
             }
         });
 
         document.body.addEventListener('click', async (e) => {
+            // Track Episodes trigger from library card
+            const trackBtn = e.target.closest('.btn-track-card');
+            if (trackBtn) {
+                const itemId = trackBtn.dataset.id;
+                const showItem = allContent.find(c => String(c.id) === String(itemId) || String(c.tmdb_id) === String(itemId));
+                if (showItem) switchView('show-tracker', showItem);
+                return;
+            }
+
+            // Clicking poster or title in library opens show tracker
+            const posterEl = e.target.closest('.catalog-grid .card-poster');
+            const titleEl = e.target.closest('.catalog-grid .card-title');
+            if (posterEl || titleEl) {
+                const target = posterEl || titleEl;
+                const itemId = target.dataset.id;
+                const showItem = allContent.find(c => String(c.id) === String(itemId) || String(c.tmdb_id) === String(itemId));
+                if (showItem) {
+                    switchView('show-tracker', showItem);
+                    return;
+                }
+            }
+
             // Rating Buttons (Thumbs Up / Down)
             if (e.target.classList.contains('rating-btn')) {
                 const itemId = e.target.dataset.id;

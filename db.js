@@ -198,7 +198,28 @@ const db = {
                 const existing = map.get(key);
                 const tLocal = new Date(w.updated_at || 0).getTime();
                 const tCloud = new Date(existing.updated_at || 0).getTime();
-                map.set(key, tLocal >= tCloud ? { ...existing, ...w } : { ...w, ...existing });
+                const baseWinner = tLocal >= tCloud ? { ...existing, ...w } : { ...w, ...existing };
+
+                // Non-destructive union of watched episodes across devices
+                const mergedEpisodes = {
+                    ...(existing.episodes_watched || {}),
+                    ...(w.episodes_watched || {})
+                };
+
+                // Non-destructive union of completed seasons
+                const existingSeasons = Array.isArray(existing.completed_seasons) ? existing.completed_seasons : [];
+                const incomingSeasons = Array.isArray(w.completed_seasons) ? w.completed_seasons : [];
+                const mergedSeasons = Array.from(new Set([...existingSeasons, ...incomingSeasons])).sort((a, b) => a - b);
+
+                // Preserve archive status if set on either record
+                const isArchived = Boolean(w.archived || existing.archived || baseWinner.status === 'completed');
+
+                map.set(key, {
+                    ...baseWinner,
+                    episodes_watched: mergedEpisodes,
+                    completed_seasons: mergedSeasons,
+                    archived: isArchived
+                });
             } else {
                 map.set(key, w);
             }
@@ -358,16 +379,24 @@ const db = {
     },
 
     // Updates
-    async upsertWatchlistItem(userId, contentItemId, status, rating = null) {
+    async upsertWatchlistItem(userId, contentItemId, status, rating = null, extraFields = {}) {
         const uuid = toDeterministicUuid(contentItemId);
         // Always persist to local storage for immediate responsiveness & guest support
         const localList = this.getLocalWatchlist();
         const existingIdx = localList.findIndex(w => String(w.content_item_id) === String(uuid) || String(w.content_item_id) === String(contentItemId));
+        const existing = existingIdx >= 0 ? localList[existingIdx] : {};
+
         const updatedEntry = {
+            ...existing,
             user_id: userId || 'guest',
             content_item_id: String(uuid),
-            status: status,
-            rating: rating,
+            status: status !== undefined ? status : (existing.status || 'watching'),
+            rating: rating !== undefined && rating !== null ? rating : (existing.rating || null),
+            episodes_watched: extraFields.episodes_watched !== undefined ? extraFields.episodes_watched : (existing.episodes_watched || {}),
+            completed_seasons: extraFields.completed_seasons !== undefined ? extraFields.completed_seasons : (existing.completed_seasons || []),
+            archived: extraFields.archived !== undefined ? extraFields.archived : (existing.archived || false),
+            watched_count: extraFields.watched_count !== undefined ? extraFields.watched_count : (existing.watched_count || 0),
+            total_episodes: extraFields.total_episodes !== undefined ? extraFields.total_episodes : (existing.total_episodes || 0),
             updated_at: new Date().toISOString()
         };
 
