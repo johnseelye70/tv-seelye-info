@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.8.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.8.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.8.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.9.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.9.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.9.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=1.8.0">
+    <link rel="stylesheet" href="style.css?v=1.9.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -29,10 +29,13 @@
             <div class="logo-subline">
                 <span class="domain">tv.seelye.info</span>
                 <span class="logo-divider">•</span>
-                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.8.0</button>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.9.0</button>
             </div>
         </div>
         <div class="auth-section">
+            <a href="https://seelye.info" id="btn-home-seelye" class="btn-home-seelye" title="seelye.info Home" aria-label="seelye.info Home">
+                <span class="home-icon">🏠</span>
+            </a>
             <button id="settings-btn" class="btn secondary-btn">Settings</button>
             <span id="auth-status-badge" class="auth-badge">Checking auth...</span>
             <button id="auth-btn" class="btn primary-btn">Login</button>
@@ -247,7 +250,7 @@
                     <div>
                         <div class="changelog-title-group">
                             <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
-                            <span class="changelog-current-badge">Beta 1.8.0</span>
+                            <span class="changelog-current-badge">Beta 1.9.0</span>
                         </div>
                         <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
                     </div>
@@ -260,8 +263,14 @@
                     <ul class="changelog-timeline-list">
                         <li class="changelog-entry">
                             <div class="changelog-entry-header">
-                                <span class="changelog-version-tag">Beta 1.8.0</span>
+                                <span class="changelog-version-tag">Beta 1.9.0</span>
                                 <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Seelye.info Ecosystem Home Navigation:</strong> Added a dedicated icon-only home navigation button to the top header matching ecosystem design standards across <code>seelye-tree</code>, <code>lions.seelye.info</code>, and <code>games.seelye.info</code>. Provides instant one-click return to the main family portal at <code>https://seelye.info</code> without text clutter, styled with a circular dark glassmorphic surface, subtle interactive hover glow, and responsive scaling across mobile and desktop viewports.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 1.8.0</span>
                             </div>
                             <p class="changelog-desc"><strong>iPad &amp; Mobile Web Streaming Architecture &amp; DRM Policy Clarification:</strong> Integrated device-aware streaming advisories into the inline episode theater explaining Disney+ and Netflix platform-level DRM restrictions. While in-browser video playback (previews, official trailers, recaps, and clips) is fully supported inline across all iPad and iPhone browsers without third-party apps, commercial full-episode streaming providers actively mandate their native iPadOS/iOS App Store applications for protected FairPlay DRM playback on touch devices, reserving direct in-browser web playback for Mac/PC desktop environments.</p>
                         </li>
@@ -599,8 +608,8 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=1.5.0"></script>
-    <script src="db.js?v=1.5.0"></script>
-    <script src="app.js?v=1.5.0"></script>
+    <script src="service_catalog.js?v=1.9.0"></script>
+    <script src="db.js?v=1.9.0"></script>
+    <script src="app.js?v=1.9.0"></script>
 </body>
 </html>

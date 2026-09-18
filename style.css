@@ -105,6 +105,47 @@ a { color: var(--accent-color); text-decoration: none; }
     gap: 1rem;
 }
 
+/* --- Ecosystem Home Button (seelye.info) --- */
+.btn-home-seelye {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-main);
+    text-decoration: none;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.btn-home-seelye:hover {
+    background: rgba(0, 195, 255, 0.15);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 10px rgba(0, 195, 255, 0.35);
+    transform: translateY(-1px);
+}
+
+.btn-home-seelye:active {
+    transform: translateY(0);
+}
+
+.btn-home-seelye .home-icon {
+    font-size: 1.05rem;
+    line-height: 1;
+    display: inline-block;
+    transition: transform var(--transition-fast);
+    user-select: none;
+}
+
+.btn-home-seelye:hover .home-icon {
+    transform: scale(1.12);
+}
+
 .badge, .auth-badge {
     padding: 0.3rem 0.75rem;
     border-radius: 20px;
@@ -1796,6 +1837,15 @@ a { color: var(--accent-color); text-decoration: none; }
     .auth-section {
         gap: 0.45rem;
         flex-shrink: 0;
+    }
+
+    .btn-home-seelye {
+        width: 30px;
+        height: 30px;
+    }
+
+    .btn-home-seelye .home-icon {
+        font-size: 0.95rem;
     }
 
     .auth-section .btn {
