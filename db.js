@@ -206,9 +206,85 @@ const db = {
         return Array.from(map.values());
     },
 
+    async fetchUserCloudData(userId, email = null) {
+        if (!userId && !email) return { library: [], watchlist: [], taste: null };
+
+        let cloudLib = [];
+        let cloudWatch = [];
+        let cloudTaste = null;
+
+        // 1. Query PostgreSQL system_settings by userId
+        if (userId && supabaseClient) {
+            try {
+                const libVal = await this.getSystemSetting(`user_library_${userId}`);
+                if (libVal) {
+                    const parsed = JSON.parse(libVal);
+                    if (Array.isArray(parsed) && parsed.length > 0) cloudLib = parsed;
+                }
+                const watchVal = await this.getSystemSetting(`user_watchlist_${userId}`);
+                if (watchVal) {
+                    const parsed = JSON.parse(watchVal);
+                    if (Array.isArray(parsed) && parsed.length > 0) cloudWatch = parsed;
+                }
+                const tasteVal = await this.getSystemSetting(`user_taste_${userId}`);
+                if (tasteVal) {
+                    const parsed = JSON.parse(tasteVal);
+                    if (parsed) cloudTaste = parsed;
+                }
+            } catch (e) {
+                console.warn("fetchUserCloudData settings by userId error:", e);
+            }
+        }
+
+        // 2. Query PostgreSQL system_settings by deterministic email hash if not found
+        if (email && cloudLib.length === 0 && supabaseClient) {
+            try {
+                const emailKey = toDeterministicUuid('email:' + String(email).toLowerCase().trim());
+                const libVal = await this.getSystemSetting(`user_library_${emailKey}`);
+                if (libVal) {
+                    const parsed = JSON.parse(libVal);
+                    if (Array.isArray(parsed) && parsed.length > 0) cloudLib = parsed;
+                }
+                if (cloudWatch.length === 0) {
+                    const watchVal = await this.getSystemSetting(`user_watchlist_${emailKey}`);
+                    if (watchVal) {
+                        const parsed = JSON.parse(watchVal);
+                        if (Array.isArray(parsed) && parsed.length > 0) cloudWatch = parsed;
+                    }
+                }
+                if (!cloudTaste) {
+                    const tasteVal = await this.getSystemSetting(`user_taste_${emailKey}`);
+                    if (tasteVal) cloudTaste = JSON.parse(tasteVal);
+                }
+            } catch (e) {
+                console.warn("fetchUserCloudData settings by email error:", e);
+            }
+        }
+
+        // 3. Fallback to Supabase Auth user_metadata
+        if (cloudLib.length === 0 || cloudWatch.length === 0) {
+            try {
+                const user = await this.getCurrentUser();
+                if (user?.user_metadata) {
+                    if (cloudLib.length === 0 && Array.isArray(user.user_metadata.tv_library) && user.user_metadata.tv_library.length > 0) {
+                        cloudLib = user.user_metadata.tv_library;
+                    }
+                    if (cloudWatch.length === 0 && Array.isArray(user.user_metadata.tv_watchlist) && user.user_metadata.tv_watchlist.length > 0) {
+                        cloudWatch = user.user_metadata.tv_watchlist;
+                    }
+                    if (!cloudTaste && user.user_metadata.tv_taste_quiz) {
+                        cloudTaste = user.user_metadata.tv_taste_quiz;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        return { library: cloudLib, watchlist: cloudWatch, taste: cloudTaste };
+    },
+
     async getContentItems() {
         let remoteItems = [];
-        let userMetaItems = [];
+        let cloudUserItems = [];
 
         if (supabaseClient) {
             try {
@@ -226,14 +302,17 @@ const db = {
 
             try {
                 const user = await this.getCurrentUser();
-                if (user?.user_metadata?.tv_library && Array.isArray(user.user_metadata.tv_library)) {
-                    userMetaItems = user.user_metadata.tv_library;
+                if (user) {
+                    const cloudData = await this.fetchUserCloudData(user.id, user.email);
+                    if (cloudData.library && cloudData.library.length > 0) {
+                        cloudUserItems = cloudData.library;
+                    }
                 }
             } catch(e) {}
         }
 
         const localItems = this.getLocalLibrary();
-        let merged = this.mergeLibrarySafely(localItems, userMetaItems);
+        let merged = this.mergeLibrarySafely(localItems, cloudUserItems);
         merged = this.mergeLibrarySafely(merged, remoteItems);
 
         // Keep local storage fresh with resolved library
@@ -246,7 +325,7 @@ const db = {
 
     async getUserWatchlist(userId) {
         let remoteList = [];
-        let userMetaWatch = [];
+        let cloudUserWatch = [];
 
         if (userId && supabaseClient) {
             try {
@@ -260,14 +339,15 @@ const db = {
 
             try {
                 const user = await this.getCurrentUser();
-                if (user?.user_metadata?.tv_watchlist && Array.isArray(user.user_metadata.tv_watchlist)) {
-                    userMetaWatch = user.user_metadata.tv_watchlist;
+                const cloudData = await this.fetchUserCloudData(userId, user?.email);
+                if (cloudData.watchlist && cloudData.watchlist.length > 0) {
+                    cloudUserWatch = cloudData.watchlist;
                 }
             } catch(e) {}
         }
 
         const localList = this.getLocalWatchlist();
-        let merged = this.mergeWatchlistSafely(localList, userMetaWatch);
+        let merged = this.mergeWatchlistSafely(localList, cloudUserWatch);
         merged = this.mergeWatchlistSafely(merged, remoteList);
 
         if (merged.length > 0) {
@@ -299,8 +379,10 @@ const db = {
         this.saveLocalWatchlist(localList);
 
         if (userId && userId !== 'guest') {
-            // Push to cloud user metadata immediately
-            this.pushLocalToCloud(userId);
+            try {
+                const user = await this.getCurrentUser();
+                await this.pushLocalToCloud(userId, user?.email);
+            } catch(e) {}
         }
 
         if (!userId || !supabaseClient) {
@@ -341,11 +423,11 @@ const db = {
         const localWatchlist = this.getLocalWatchlist().filter(w => String(w.content_item_id) !== idStr && String(w.content_item_id) !== rawId);
         this.saveLocalWatchlist(localWatchlist);
 
-        // Sync cloud user metadata if authenticated
+        // Sync cloud PostgreSQL store if authenticated
         try {
             const user = await this.getCurrentUser();
             if (user) {
-                await this.pushLocalToCloud(user.id);
+                await this.pushLocalToCloud(user.id, user.email);
             }
         } catch (e) {}
 
@@ -372,7 +454,10 @@ const db = {
         this.saveLocalWatchlist(localList);
 
         if (userId && userId !== 'guest') {
-            this.pushLocalToCloud(userId);
+            try {
+                const user = await this.getCurrentUser();
+                await this.pushLocalToCloud(userId, user?.email);
+            } catch(e) {}
         }
 
         if (userId && supabaseClient) {
@@ -410,11 +495,11 @@ const db = {
         }
         this.saveLocalLibrary(localLib);
 
-        // Immediate cloud metadata push for authenticated users
+        // Immediate cloud store push for authenticated users
         try {
             const user = await this.getCurrentUser();
             if (user) {
-                this.pushLocalToCloud(user.id);
+                await this.pushLocalToCloud(user.id, user.email);
             }
         } catch (e) {}
 
@@ -455,37 +540,101 @@ const db = {
         }
     },
 
-    async pushLocalToCloud(userId) {
-        if (!userId || !supabaseClient) return;
+    async pushLocalToCloud(userId, email = null) {
+        if (!userId || !supabaseClient) return false;
         try {
+            if (!email) {
+                try {
+                    const u = await this.getCurrentUser();
+                    if (u?.email) email = u.email;
+                } catch(e) {}
+            }
+
             const localLib = this.getLocalLibrary();
             const localWatch = this.getLocalWatchlist();
             let localTaste = null;
             try { localTaste = JSON.parse(localStorage.getItem('tv_taste_quiz_answers') || 'null'); } catch(e) {}
 
-            await supabaseClient.auth.updateUser({
-                data: {
-                    tv_library: localLib,
-                    tv_watchlist: localWatch,
-                    tv_taste_quiz: localTaste,
-                    last_synced_at: new Date().toISOString()
+            const jsonLib = JSON.stringify(localLib);
+            const jsonWatch = JSON.stringify(localWatch);
+            const jsonTaste = localTaste ? JSON.stringify(localTaste) : null;
+
+            // 1. Primary persistence: PostgreSQL system_settings record by userId
+            await this.setSystemSetting(`user_library_${userId}`, jsonLib);
+            await this.setSystemSetting(`user_watchlist_${userId}`, jsonWatch);
+            if (jsonTaste) {
+                await this.setSystemSetting(`user_taste_${userId}`, jsonTaste);
+            }
+
+            // 2. Secondary persistence: PostgreSQL system_settings record by deterministic email hash
+            if (email) {
+                const emailKey = toDeterministicUuid('email:' + String(email).toLowerCase().trim());
+                await this.setSystemSetting(`user_library_${emailKey}`, jsonLib);
+                await this.setSystemSetting(`user_watchlist_${emailKey}`, jsonWatch);
+                if (jsonTaste) {
+                    await this.setSystemSetting(`user_taste_${emailKey}`, jsonTaste);
                 }
-            });
+            }
+
+            // 3. Backup update to Supabase Auth user_metadata
+            try {
+                await supabaseClient.auth.updateUser({
+                    data: {
+                        tv_library: localLib,
+                        tv_watchlist: localWatch,
+                        tv_taste_quiz: localTaste,
+                        last_synced_at: new Date().toISOString()
+                    }
+                });
+            } catch (authErr) {
+                // Secondary auth metadata non-blocking
+            }
+
+            // 4. Background attempt to populate relational tables
+            try {
+                for (const item of localLib) {
+                    const uuid = toDeterministicUuid(item.id);
+                    await supabaseClient.from('content_items').upsert({
+                        id: uuid,
+                        title: item.title,
+                        type: item.type || 'series_season',
+                        release_year: item.release_year ? parseInt(item.release_year) : null,
+                        poster_url: item.poster_url || null,
+                        streaming_service_id: null,
+                        franchise_id: null
+                    }, { onConflict: 'id' });
+                }
+                for (const w of localWatch) {
+                    const uuid = toDeterministicUuid(w.content_item_id);
+                    await supabaseClient.from('user_watchlist').upsert({
+                        user_id: userId,
+                        content_item_id: uuid,
+                        status: w.status,
+                        rating: w.rating,
+                        updated_at: w.updated_at || new Date().toISOString()
+                    }, { onConflict: 'user_id,content_item_id' });
+                }
+            } catch (tblErr) {}
+
+            return true;
         } catch (e) {
             console.warn("pushLocalToCloud error:", e);
+            return false;
         }
     },
 
-    async syncCloudUserData(userId) {
-        if (!userId || !supabaseClient) return;
+    async syncCloudUserData(userId, email = null) {
+        if (!userId || !supabaseClient) return null;
         try {
-            // 1. Fetch user from Supabase to get latest cloud metadata
-            const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
-            if (userErr || !user) return;
+            if (!email) {
+                try {
+                    const u = await this.getCurrentUser();
+                    if (u?.email) email = u.email;
+                } catch(e) {}
+            }
 
-            const cloudLib = user.user_metadata?.tv_library || [];
-            const cloudWatch = user.user_metadata?.tv_watchlist || [];
-            const cloudTaste = user.user_metadata?.tv_taste_quiz || null;
+            // 1. Fetch user data from PostgreSQL system_settings and user_metadata
+            const { library: cloudLib, watchlist: cloudWatch, taste: cloudTaste } = await this.fetchUserCloudData(userId, email);
 
             // 2. Fetch local storage items
             const localLib = this.getLocalLibrary();
@@ -505,47 +654,15 @@ const db = {
                 try { localStorage.setItem('tv_taste_quiz_answers', JSON.stringify(mergedTaste)); } catch(e) {}
             }
 
-            // 5. Push merged state back to cloud user_metadata
-            await supabaseClient.auth.updateUser({
-                data: {
-                    tv_library: mergedLib,
-                    tv_watchlist: mergedWatch,
-                    tv_taste_quiz: mergedTaste,
-                    last_synced_at: new Date().toISOString()
-                }
-            });
-
-            // 6. Secondary background attempt to populate database tables
-            try {
-                for (const item of mergedLib) {
-                    const uuid = toDeterministicUuid(item.id);
-                    await supabaseClient.from('content_items').upsert({
-                        id: uuid,
-                        title: item.title,
-                        type: item.type || 'series_season',
-                        release_year: item.release_year ? parseInt(item.release_year) : null,
-                        poster_url: item.poster_url || null,
-                        streaming_service_id: null,
-                        franchise_id: null
-                    }, { onConflict: 'id' });
-                }
-                for (const w of mergedWatch) {
-                    const uuid = toDeterministicUuid(w.content_item_id);
-                    await supabaseClient.from('user_watchlist').upsert({
-                        user_id: userId,
-                        content_item_id: uuid,
-                        status: w.status,
-                        rating: w.rating,
-                        updated_at: w.updated_at || new Date().toISOString()
-                    }, { onConflict: 'user_id,content_item_id' });
-                }
-            } catch (tblErr) {
-                // Secondary table sync is non-blocking
+            // 5. Push merged state back to cloud store if any records exist
+            if (mergedLib.length > 0 || mergedWatch.length > 0) {
+                await this.pushLocalToCloud(userId, email);
             }
 
             return { library: mergedLib, watchlist: mergedWatch, taste: mergedTaste };
         } catch (e) {
             console.warn("syncCloudUserData error:", e);
+            return null;
         }
     },
 

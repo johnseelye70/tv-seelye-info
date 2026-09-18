@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.3.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.3.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.3.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.4.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.4.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.4.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=1.3.0">
+    <link rel="stylesheet" href="style.css?v=1.4.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -29,7 +29,7 @@
             <div class="logo-subline">
                 <span class="domain">tv.seelye.info</span>
                 <span class="logo-divider">•</span>
-                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.3.0</button>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.4.0</button>
             </div>
         </div>
         <div class="auth-section">
@@ -225,7 +225,7 @@
                     <div>
                         <div class="changelog-title-group">
                             <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
-                            <span class="changelog-current-badge">Beta 1.3.0</span>
+                            <span class="changelog-current-badge">Beta 1.4.0</span>
                         </div>
                         <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
                     </div>
@@ -238,8 +238,14 @@
                     <ul class="changelog-timeline-list">
                         <li class="changelog-entry">
                             <div class="changelog-entry-header">
-                                <span class="changelog-version-tag">Beta 1.3.0</span>
+                                <span class="changelog-version-tag">Beta 1.4.0</span>
                                 <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Hardened Multi-Device PostgreSQL Persistence:</strong> Solved cross-device synchronization failures across laptop, iPhone, iPad, and desktop sessions. Replaced fragile auth metadata payloads with centralized PostgreSQL cloud storage in <code>system_settings</code> keyed by unique user UUID and deterministic email hashes. Enabled immediate awaited cloud sync on show additions, status toggles, ratings, and deletions with push-guard non-destructive reconciliation (<code>mergeLibrarySafely</code>). Added instant automated cloud synchronization upon login with user toast feedback, seamless background tab-visibility refresh, and an explicit manual cloud sync control in Settings.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 1.3.0</span>
                             </div>
                             <p class="changelog-desc"><strong>Streamlined Native Mobile Architecture &amp; Bottom Tab Bar:</strong> Completely decluttered the iPhone screen by replacing stacked vertical menu clumps with a dedicated iOS Bottom Navigation Bar and unified native dropdown filter controls. Relocated main app navigation (Library, Top Picks, Explore) to a fixed thumb-accessible bottom tab bar with safe-area insets. Consolidated 12 desktop pill buttons into a compact, space-efficient control bar featuring native Status and Provider selection wheels, instantly freeing up the top of the viewport and placing library shows center stage.</p>
                         </li>
@@ -468,6 +474,16 @@
                     <button id="update-admin-pass-btn" class="btn secondary-btn" type="button">Update Admin Password</button>
                     <p id="admin-pass-status" class="status-msg" style="margin-top: 10px;"></p>
                 </div>
+
+                <!-- Cloud Multi-Device Sync Card -->
+                <div class="admin-card" id="admin-cloud-sync-card" style="margin-top: 20px;">
+                    <h3>Cloud Multi-Device Sync</h3>
+                    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 14px;">Sync your personal library, watchlist statuses, and preferences seamlessly across laptop, iPhone, iPad, and desktop.</p>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+                        <span id="cloud-sync-status-badge" style="font-size: 0.85rem; color: var(--text-muted);">Status: Ready</span>
+                        <button id="force-cloud-sync-btn" class="btn primary-btn" type="button" style="padding: 8px 16px; font-size: 0.88rem;">☁️ Sync Cloud Now</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -537,8 +553,8 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=1.3.0"></script>
-    <script src="db.js?v=1.3.0"></script>
-    <script src="app.js?v=1.3.0"></script>
+    <script src="service_catalog.js?v=1.4.0"></script>
+    <script src="db.js?v=1.4.0"></script>
+    <script src="app.js?v=1.4.0"></script>
 </body>
 </html>

@@ -718,7 +718,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'visible' && currentUser) {
                 try {
-                    await window.db.syncCloudUserData(currentUser.id);
+                    await window.db.syncCloudUserData(currentUser.id, currentUser.email);
                     allContent = await window.db.getContentItems();
                     await loadUserData();
                 } catch (e) {}
@@ -733,18 +733,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (currentView === 'changelog') switchView('library');
             }
             updateAuthUI();
-            if (currentUser) {
-                await window.db.syncCloudUserData(currentUser.id);
-                allContent = await window.db.getContentItems();
-                await healLibraryServices();
+            if (currentUser && event === 'SIGNED_IN') {
+                try {
+                    await window.db.syncCloudUserData(currentUser.id, currentUser.email);
+                    allContent = await window.db.getContentItems();
+                    await healLibraryServices();
+                    await loadUserData();
+                } catch (e) {
+                    console.warn("Auth change sync error:", e);
+                }
+            } else if (!currentUser) {
+                await loadUserData();
             }
-            await loadUserData();
         });
 
         currentUser = await window.db.getCurrentUser();
         updateAuthUI();
         if (currentUser) {
-            await window.db.syncCloudUserData(currentUser.id);
+            await window.db.syncCloudUserData(currentUser.id, currentUser.email);
         }
         
         allServices = await window.db.getStreamingServices();
@@ -2699,17 +2705,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const email = document.getElementById('email').value;
+            const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             loginError.textContent = '';
             loginSuccess.style.display = 'none';
 
             if (isLoginMode) {
-                const { error } = await window.db.login(email, password);
-                if (error) loginError.textContent = error.message;
-                else {
+                authSubmitBtn.disabled = true;
+                authSubmitBtn.textContent = 'Logging in...';
+                const { data, error } = await window.db.login(email, password);
+                authSubmitBtn.disabled = false;
+                authSubmitBtn.textContent = 'Login';
+
+                if (error) {
+                    loginError.textContent = error.message;
+                } else {
                     loginModal.classList.add('hidden');
                     loginForm.reset();
+                    currentUser = data?.user || await window.db.getCurrentUser();
+                    updateAuthUI();
+                    if (currentUser) {
+                        showToast('Syncing your library from cloud...', 'info', 2500);
+                        await window.db.syncCloudUserData(currentUser.id, currentUser.email);
+                        allContent = await window.db.getContentItems();
+                        await healLibraryServices();
+                        await loadUserData();
+                        showToast(`✓ Cloud sync complete! Loaded ${allContent.length} shows.`, 'success', 3500);
+                    }
                 }
             } else {
                 const { data, error } = await window.db.signup(email, password);
@@ -2763,6 +2785,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const savedKey = localStorage.getItem('tmdb_api_key');
                     if (savedKey) tmdbApiKeyInput.value = savedKey;
                 }
+                const syncBadge = document.getElementById('cloud-sync-status-badge');
+                if (syncBadge) {
+                    if (currentUser) {
+                        syncBadge.textContent = `Connected (${currentUser.email}) • ${allContent.length} shows`;
+                    } else {
+                        syncBadge.textContent = 'Not logged in (Local guest session)';
+                    }
+                }
             });
         });
         
@@ -2776,6 +2806,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (e.target === settingsModal) {
                     settingsModal.classList.add('hidden');
                     lockAdmin();
+                }
+            });
+        }
+
+        const forceCloudSyncBtn = document.getElementById('force-cloud-sync-btn');
+        if (forceCloudSyncBtn) {
+            forceCloudSyncBtn.addEventListener('click', async () => {
+                if (!currentUser) {
+                    showToast('Please log in first to sync with cloud.', 'warning');
+                    return;
+                }
+                forceCloudSyncBtn.disabled = true;
+                forceCloudSyncBtn.textContent = 'Syncing...';
+                try {
+                    showToast('Syncing with cloud PostgreSQL store...', 'info', 2500);
+                    await window.db.syncCloudUserData(currentUser.id, currentUser.email);
+                    allContent = await window.db.getContentItems();
+                    await healLibraryServices();
+                    await loadUserData();
+                    showToast(`✓ Cloud sync complete! Loaded ${allContent.length} shows.`, 'success', 3500);
+                    const syncBadge = document.getElementById('cloud-sync-status-badge');
+                    if (syncBadge) {
+                        syncBadge.textContent = `✓ Synced (${allContent.length} shows at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
+                    }
+                } catch(e) {
+                    showToast('Cloud sync error: ' + (e.message || e), 'error');
+                } finally {
+                    forceCloudSyncBtn.disabled = false;
+                    forceCloudSyncBtn.textContent = '☁️ Sync Cloud Now';
                 }
             });
         }
