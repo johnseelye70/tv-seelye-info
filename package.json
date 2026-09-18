@@ -1,6 +1,6 @@
 {
   "name": "tv-seelye-info",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "private": true,
   "description": "Seelye TV Hub & Local Roku Bridge Subsystem",
   "scripts": {

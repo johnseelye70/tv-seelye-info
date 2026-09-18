@@ -1,6 +1,6 @@
 /**
  * Roku External Control Protocol (ECP) Client Engine
- * tv.seelye.info - Beta 2.3.0
+ * tv.seelye.info - Beta 2.4.0
  * 
  * Provides direct client-side LAN communication with Roku streaming devices.
  * Supports remote keypresses, app launching, universal search, and episode playback targeting.

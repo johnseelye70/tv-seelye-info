@@ -2,16 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2.3.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=2.3.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2.3.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2.4.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=2.4.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2.4.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=2.3.0">
+    <link rel="stylesheet" href="style.css?v=2.4.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -29,7 +29,7 @@
             <div class="logo-subline">
                 <span class="domain">tv.seelye.info</span>
                 <span class="logo-divider">•</span>
-                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 2.3.0</button>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 2.4.0</button>
             </div>
         </div>
         <div class="auth-section">
@@ -454,7 +454,7 @@
                     <div>
                         <div class="changelog-title-group">
                             <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
-                            <span class="changelog-current-badge">Beta 2.3.0</span>
+                            <span class="changelog-current-badge">Beta 2.4.0</span>
                         </div>
                         <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
                     </div>
@@ -467,8 +467,14 @@
                     <ul class="changelog-timeline-list">
                         <li class="changelog-entry">
                             <div class="changelog-entry-header">
-                                <span class="changelog-version-tag">Beta 2.3.0</span>
+                                <span class="changelog-version-tag">Beta 2.4.0</span>
                                 <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>iOS Safari Gesture Stability &amp; Zero Side-to-Side Swirling:</strong> Eliminated horizontal elasticity and sloppy side-to-side rubber-banding on iOS Safari by locking the viewport scale (<code>maximum-scale=1.0, user-scalable=no, viewport-fit=cover</code>), enforcing strict <code>touch-action: pan-y</code> and <code>overscroll-behavior-x: none</code> on <code>html</code>, <code>body</code>, and main dashboard containers, and establishing boundary containment with <code>overflow-x: hidden</code> on <code>body</code>. Intercepted multi-touch gestures and multi-finger <code>touchmove</code> events in JavaScript to prevent accidental canvas shifting and pinch distortion while preserving fluid, native vertical scrolling, input typing, and horizontal carousel navigation.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 2.3.0</span>
                             </div>
                             <p class="changelog-desc"><strong>Local PC Hardware Bridge &amp; Real-Time Relay Subsystem:</strong> Built an ultra-low-latency local Roku hardware bridge daemon (<code>roku-bridge.js</code> / <code>start-roku-bridge.bat</code>) running on the local network. Utilizing Supabase Realtime WebSocket broadcast channels, the bridge seamlessly receives remote keypresses, streaming app launches (Netflix, Disney+, Hulu, etc.), and episode casting commands from mobile browsers (iOS Safari / Android) over HTTPS without mixed-content or Private Network Access (PNA) restrictions, dispatching them directly to local Roku TVs on port 8060 in under 20ms. Features live bridge heartbeat monitoring, visual connection status pills, and automatic direct LAN fallback.</p>
                         </li>
@@ -859,9 +865,9 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=2.3.0"></script>
-    <script src="db.js?v=2.3.0"></script>
-    <script src="roku.js?v=2.3.0"></script>
-    <script src="app.js?v=2.3.0"></script>
+    <script src="service_catalog.js?v=2.4.0"></script>
+    <script src="db.js?v=2.4.0"></script>
+    <script src="roku.js?v=2.4.0"></script>
+    <script src="app.js?v=2.4.0"></script>
 </body>
 </html>

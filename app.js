@@ -1,3 +1,15 @@
+// Enforce zero pinch-to-zoom, multi-touch scale lockdown, and zero canvas swirling on iOS Safari
+document.addEventListener('touchmove', (e) => {
+    if (e.touches && e.touches.length > 1) {
+        e.preventDefault();
+    }
+}, { passive: false });
+
+const blockIOSGesture = (e) => { e.preventDefault(); };
+document.addEventListener('gesturestart', blockIOSGesture, { passive: false });
+document.addEventListener('gesturechange', blockIOSGesture, { passive: false });
+document.addEventListener('gestureend', blockIOSGesture, { passive: false });
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // Non-intrusive Toast Notification System
