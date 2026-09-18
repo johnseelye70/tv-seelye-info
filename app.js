@@ -1563,6 +1563,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                             Watch on YouTube ↗
                                         </a>
                                     </div>
+                                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 6px; text-align: center; line-height: 1.4;">
+                                        ℹ️ <em>Mobile browser notice:</em> Disney+ &amp; Netflix enforce DRM policies that restrict full episode playback to their official apps on iPad/iPhone. Full in-browser web playback is supported on desktop &amp; laptop browsers.
+                                    </div>
                                 </div>
                             </div>
                         `;

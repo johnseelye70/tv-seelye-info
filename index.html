@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.7.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.7.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.7.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.8.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.8.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.8.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=1.7.0">
+    <link rel="stylesheet" href="style.css?v=1.8.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -29,7 +29,7 @@
             <div class="logo-subline">
                 <span class="domain">tv.seelye.info</span>
                 <span class="logo-divider">•</span>
-                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.7.0</button>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.8.0</button>
             </div>
         </div>
         <div class="auth-section">
@@ -247,7 +247,7 @@
                     <div>
                         <div class="changelog-title-group">
                             <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
-                            <span class="changelog-current-badge">Beta 1.7.0</span>
+                            <span class="changelog-current-badge">Beta 1.8.0</span>
                         </div>
                         <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
                     </div>
@@ -260,8 +260,14 @@
                     <ul class="changelog-timeline-list">
                         <li class="changelog-entry">
                             <div class="changelog-entry-header">
-                                <span class="changelog-version-tag">Beta 1.7.0</span>
+                                <span class="changelog-version-tag">Beta 1.8.0</span>
                                 <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>iPad &amp; Mobile Web Streaming Architecture &amp; DRM Policy Clarification:</strong> Integrated device-aware streaming advisories into the inline episode theater explaining Disney+ and Netflix platform-level DRM restrictions. While in-browser video playback (previews, official trailers, recaps, and clips) is fully supported inline across all iPad and iPhone browsers without third-party apps, commercial full-episode streaming providers actively mandate their native iPadOS/iOS App Store applications for protected FairPlay DRM playback on touch devices, reserving direct in-browser web playback for Mac/PC desktop environments.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 1.7.0</span>
                             </div>
                             <p class="changelog-desc"><strong>Strict US Streaming Regional Constraints &amp; Direct Provider Launchers:</strong> Enforced comprehensive United States household and catalog constraints across the platform. Resolved Disney+ edge routing 404s (&ldquo;not available in your region&rdquo;) by pointing direct streaming actions to verified US portal endpoints (<code>disneyplus.com/en-us/home</code>) and adding direct US JustWatch / TMDB title links (<code>themoviedb.org/tv/{id}/watch?locale=US</code>). Hardened Peacock TV launchers to <code>peacocktv.com/watch/home</code>, Apple TV+ to <code>tv.apple.com/us/</code>, and Prime Video instant video searches. Filtered all live TMDB Discovery queries with <code>watch_region=US</code> and <code>with_watch_monetization_types=flatrate|free|ads</code>, enforced <code>region=US&amp;language=en-US</code> across title searches, and constrained streaming provider auto-resolution strictly to US watch listings.</p>
                         </li>
