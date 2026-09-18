@@ -5,27 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.0.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.0.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.0.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1.1.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=1.1.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1.1.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=1.0.0">
+    <link rel="stylesheet" href="style.css?v=1.1.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
+    <!-- Phone Landscape Advisory Banner -->
+    <div id="phone-orientation-banner" class="phone-orientation-banner" role="alert" aria-live="polite">
+        <div class="orientation-banner-content">
+            <span class="orientation-banner-icon">📱</span>
+            <span>For the optimal Seelye TV experience on your phone, please rotate to portrait mode.</span>
+            <button type="button" class="orientation-dismiss-btn" onclick="document.getElementById('phone-orientation-banner').classList.remove('visible')" aria-label="Dismiss orientation notice">✕</button>
+        </div>
+    </div>
     <header class="site-header">
         <div class="logo">
             <h1>Seelye TV Hub</h1>
             <div class="logo-subline">
                 <span class="domain">tv.seelye.info</span>
                 <span class="logo-divider">•</span>
-                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.0.0</button>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 1.1.0</button>
             </div>
         </div>
         <div class="auth-section">
-            <button id="settings-btn" class="btn secondary-btn" style="margin-right: 10px;">Settings</button>
+            <button id="settings-btn" class="btn secondary-btn">Settings</button>
             <span id="auth-status-badge" class="auth-badge">Checking auth...</span>
             <button id="auth-btn" class="btn primary-btn">Login</button>
         </div>
@@ -175,7 +183,7 @@
                     <div>
                         <div class="changelog-title-group">
                             <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
-                            <span class="changelog-current-badge">Beta 1.0.0</span>
+                            <span class="changelog-current-badge">Beta 1.1.0</span>
                         </div>
                         <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
                     </div>
@@ -188,8 +196,14 @@
                     <ul class="changelog-timeline-list">
                         <li class="changelog-entry">
                             <div class="changelog-entry-header">
-                                <span class="changelog-version-tag">Beta 1.0.0</span>
+                                <span class="changelog-version-tag">Beta 1.1.0</span>
                                 <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Multi-Device Persistence &amp; Responsive Device Differentiation:</strong> Implemented real-time bidirectional library and watchlist synchronization across laptop, iPhone, and iPad sessions leveraging Supabase account metadata and non-destructive reconciliation (<code>mergeLibrarySafely</code>) with push-guards against empty fresh devices. Added dynamic device differentiation (phone, tablet, desktop) and orientation tracking (portrait, landscape). Re-engineered the mobile header to fit cleanly within iPhone bounds without horizontal overflow or elastic wiggling, optimized iPad grid viewports for both portrait (3 cols) and landscape (4–5 cols), and integrated a phone landscape rotation advisory.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 1.0.0</span>
                             </div>
                             <p class="changelog-desc"><strong>Milestone Release — Unified TV Tracking &amp; Recommendation Platform:</strong> First major milestone version bringing together the complete, production-grade TV hub experience: isolated My Library tracking, automated streaming service auto-detection across major platforms (Disney+, Netflix, Apple TV+, Hulu, Peacock, Prime Video, YouTube TV), intelligent multi-vector recommendations with 30-second taste quiz calibration, rich IMDb pop-up details modal, persistent library search-and-add capabilities, and cryptographically hardened administrative authentication.</p>
                         </li>
@@ -469,8 +483,8 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=1.0.0"></script>
-    <script src="db.js?v=1.0.0"></script>
-    <script src="app.js?v=1.0.0"></script>
+    <script src="service_catalog.js?v=1.1.0"></script>
+    <script src="db.js?v=1.1.0"></script>
+    <script src="app.js?v=1.1.0"></script>
 </body>
 </html>

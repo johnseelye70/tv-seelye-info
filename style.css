@@ -105,18 +105,25 @@ a { color: var(--accent-color); text-decoration: none; }
     gap: 1rem;
 }
 
-.badge {
-    padding: 0.25rem 0.75rem;
+.badge, .auth-badge {
+    padding: 0.3rem 0.75rem;
     border-radius: 20px;
     font-size: 0.85rem;
     background-color: var(--bg-card);
     border: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+    vertical-align: middle;
 }
 
-.badge.logged-in {
-    background-color: rgba(16, 185, 129, 0.1);
+.badge.logged-in, .auth-badge.logged-in {
+    background-color: rgba(16, 185, 129, 0.12);
     color: var(--success-color);
-    border-color: var(--success-color);
+    border-color: rgba(16, 185, 129, 0.35);
 }
 
 /* --- Buttons --- */
@@ -1682,6 +1689,304 @@ a { color: var(--accent-color); text-decoration: none; }
     font-size: 0.86em;
     color: #67e8f9;
     border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* --- Phone Orientation Notice Banner --- */
+.phone-orientation-banner {
+    display: none;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.96));
+    border-bottom: 1px solid rgba(0, 195, 255, 0.35);
+    color: #e2e8f0;
+    padding: 8px 14px;
+    font-size: 0.84rem;
+    position: sticky;
+    top: 0;
+    z-index: 999;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.phone-orientation-banner.visible {
+    display: block;
+}
+
+.orientation-banner-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.orientation-banner-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.orientation-dismiss-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 3px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.orientation-dismiss-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* ==========================================================================
+   MOBILE & IPHONE RESPONSIVE OPTIMIZATION (<= 640px)
+   Strictly adheres to iOS Safari Web App Development Best Practices:
+   - Zero horizontal elasticity (flush 100% width, no vw units)
+   - Contained strictly within phone viewport bounds
+   - 2-column mobile streaming catalog grid
+   ========================================================================== */
+@media (max-width: 640px), (max-device-width: 640px) {
+    /* Header contained flush within phone bounds */
+    .site-header {
+        padding: 0.65rem 0.85rem;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .logo {
+        flex-shrink: 1;
+        min-width: 0;
+    }
+
+    .logo h1 {
+        font-size: 1.25rem;
+        line-height: 1.2;
+    }
+
+    .logo-subline {
+        font-size: 0.72rem;
+        gap: 5px;
+        flex-wrap: nowrap;
+    }
+
+    .version-badge-btn {
+        font-size: 0.7rem;
+        padding: 1px 5px;
+    }
+
+    .auth-section {
+        gap: 0.45rem;
+        flex-shrink: 0;
+    }
+
+    .auth-section .btn {
+        padding: 0.38rem 0.65rem;
+        font-size: 0.8rem;
+    }
+
+    .auth-badge {
+        max-width: 105px;
+        font-size: 0.74rem;
+        padding: 0.25rem 0.55rem;
+    }
+
+    /* Dashboard Layout on Phone */
+    .dashboard {
+        padding: 0.85rem 0.75rem 3rem;
+        width: 100%;
+        max-width: 100%;
+        gap: 1.25rem;
+        box-sizing: border-box;
+    }
+
+    /* Primary Navigation Bar on Phone */
+    .dashboard-nav {
+        margin-bottom: 1.2rem;
+        padding: 0.3rem;
+        gap: 0.35rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .nav-tab {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.84rem;
+        gap: 0.35rem;
+    }
+
+    .nav-tab-icon {
+        font-size: 0.95rem;
+    }
+
+    .nav-tab-badge {
+        font-size: 0.7rem;
+        padding: 1px 5px;
+    }
+
+    /* Personal Library & Catalog Grids on Phone (Clean 2-Column Mobile Streaming) */
+    .catalog-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .card-poster {
+        height: 220px;
+    }
+
+    .content-card .card-info {
+        padding: 0.65rem;
+    }
+
+    .content-card .card-info h3 {
+        font-size: 0.92rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .content-card .card-meta {
+        font-size: 0.76rem;
+    }
+
+    /* Horizontal Carousels on Phone */
+    .horizontal-scroll-grid .content-card {
+        min-width: 155px;
+        max-width: 155px;
+    }
+
+    .horizontal-scroll-grid .card-poster {
+        height: 230px;
+    }
+
+    /* Filters Section on Phone */
+    .filters-section {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .filter-bar {
+        width: 100%;
+        padding-bottom: 0.25rem;
+    }
+
+    .pill-btn {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.82rem;
+    }
+
+    .search-bar {
+        width: 100%;
+    }
+
+    .search-bar input {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Modals & Dialogs on Phone */
+    .modal-content {
+        padding: 1.25rem 1rem;
+        width: 95%;
+        max-width: 95%;
+        margin: 1.5rem auto;
+    }
+
+    /* Taste Quiz Card on Phone */
+    .taste-quiz-prompt-card {
+        padding: 14px 16px;
+    }
+
+    .taste-quiz-active-card {
+        padding: 14px 16px;
+    }
+
+    .quiz-options-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .quiz-option-btn {
+        padding: 12px 14px;
+        font-size: 0.9rem;
+    }
+}
+
+/* ==========================================================================
+   IPAD & TABLET RESPONSIVE OPTIMIZATION (641px - 1024px)
+   Optimized for both Portrait and Landscape Orientations
+   ========================================================================== */
+@media (min-width: 641px) and (max-width: 1024px) {
+    .site-header {
+        padding: 0.85rem 1.5rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .dashboard {
+        padding: 1.25rem 1.5rem 3rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .auth-badge {
+        max-width: 160px;
+    }
+
+    .nav-tab {
+        padding: 0.6rem 1rem;
+        font-size: 0.92rem;
+        min-height: 44px; /* iOS touch target standard */
+    }
+}
+
+/* iPad Portrait Mode (768px - 834px approx) */
+@media (min-width: 641px) and (max-width: 1024px) and (orientation: portrait) {
+    .catalog-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1.1rem;
+    }
+
+    .card-poster {
+        height: 260px;
+    }
+
+    .horizontal-scroll-grid .content-card {
+        min-width: 185px;
+        max-width: 185px;
+    }
+
+    .horizontal-scroll-grid .card-poster {
+        height: 275px;
+    }
+}
+
+/* iPad Landscape Mode (1024px approx) */
+@media (min-width: 641px) and (max-width: 1024px) and (orientation: landscape) {
+    .catalog-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1.25rem;
+    }
+
+    .card-poster {
+        height: 280px;
+    }
+
+    .horizontal-scroll-grid .content-card {
+        min-width: 200px;
+        max-width: 200px;
+    }
+
+    .horizontal-scroll-grid .card-poster {
+        height: 295px;
+    }
 }
 
 

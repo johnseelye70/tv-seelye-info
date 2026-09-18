@@ -97,33 +97,119 @@ const db = {
         } catch(e) { return []; }
     },
 
-    // LocalStorage Fallback Helpers
+    // LocalStorage Helpers with Dual-Key Safety & Multi-Device Protection
     getLocalLibrary() {
         try {
-            return JSON.parse(localStorage.getItem('tv_hub_custom_library') || '[]');
+            const raw1 = localStorage.getItem('tv_hub_custom_library');
+            const raw2 = localStorage.getItem('tv_hub_library');
+            const arr1 = raw1 ? JSON.parse(raw1) : [];
+            const arr2 = raw2 ? JSON.parse(raw2) : [];
+            const list1 = Array.isArray(arr1) ? arr1 : [];
+            const list2 = Array.isArray(arr2) ? arr2 : [];
+            if (!list1.length && list2.length) return list2;
+            if (list1.length && !list2.length) return list1;
+            const mergedMap = new Map();
+            list2.forEach(item => { if (item && (item.id || item.tmdb_id)) mergedMap.set(String(item.id || item.tmdb_id), item); });
+            list1.forEach(item => { if (item && (item.id || item.tmdb_id)) mergedMap.set(String(item.id || item.tmdb_id), item); });
+            return Array.from(mergedMap.values());
         } catch (e) { return []; }
     },
 
     saveLocalLibrary(items) {
         try {
-            localStorage.setItem('tv_hub_custom_library', JSON.stringify(items));
+            const valid = Array.isArray(items) ? items : [];
+            const str = JSON.stringify(valid);
+            localStorage.setItem('tv_hub_custom_library', str);
+            localStorage.setItem('tv_hub_library', str);
         } catch (e) {}
     },
 
     getLocalWatchlist() {
         try {
-            return JSON.parse(localStorage.getItem('tv_hub_watchlist') || '[]');
+            const raw = localStorage.getItem('tv_hub_watchlist');
+            const arr = raw ? JSON.parse(raw) : [];
+            return Array.isArray(arr) ? arr : [];
         } catch (e) { return []; }
     },
 
     saveLocalWatchlist(items) {
         try {
-            localStorage.setItem('tv_hub_watchlist', JSON.stringify(items));
+            const valid = Array.isArray(items) ? items : [];
+            localStorage.setItem('tv_hub_watchlist', JSON.stringify(valid));
         } catch (e) {}
+    },
+
+    // Non-destructive merging helpers
+    mergeLibrarySafely(localList, cloudList) {
+        const local = Array.isArray(localList) ? localList : [];
+        const cloud = Array.isArray(cloudList) ? cloudList : [];
+        
+        // Push guard: uninitialized/fresh device loading empty array never wipes cloud library
+        if (local.length === 0 && cloud.length > 0) return [...cloud];
+        // Cloud empty: initial push from device with library
+        if (cloud.length === 0 && local.length > 0) return [...local];
+        if (local.length === 0 && cloud.length === 0) return [];
+
+        const mergedMap = new Map();
+        const getKey = (item) => {
+            if (!item) return null;
+            if (item.id) return String(item.id);
+            if (item.tmdb_id) return String(item.tmdb_id);
+            if (item.title) return 'title:' + String(item.title).toLowerCase().trim();
+            return null;
+        };
+
+        // Seed with cloud records
+        cloud.forEach(item => {
+            const key = getKey(item);
+            if (key) mergedMap.set(key, item);
+        });
+
+        // Merge local records non-destructively
+        local.forEach(item => {
+            const key = getKey(item);
+            if (!key) return;
+            if (mergedMap.has(key)) {
+                const existing = mergedMap.get(key);
+                mergedMap.set(key, { ...existing, ...item });
+            } else {
+                mergedMap.set(key, item);
+            }
+        });
+
+        return Array.from(mergedMap.values());
+    },
+
+    mergeWatchlistSafely(localList, cloudList) {
+        const local = Array.isArray(localList) ? localList : [];
+        const cloud = Array.isArray(cloudList) ? cloudList : [];
+        if (local.length === 0 && cloud.length > 0) return [...cloud];
+        if (cloud.length === 0 && local.length > 0) return [...local];
+        if (local.length === 0 && cloud.length === 0) return [];
+
+        const map = new Map();
+        cloud.forEach(w => {
+            if (w && w.content_item_id) map.set(String(w.content_item_id), w);
+        });
+        local.forEach(w => {
+            if (!w || !w.content_item_id) return;
+            const key = String(w.content_item_id);
+            if (map.has(key)) {
+                const existing = map.get(key);
+                const tLocal = new Date(w.updated_at || 0).getTime();
+                const tCloud = new Date(existing.updated_at || 0).getTime();
+                map.set(key, tLocal >= tCloud ? { ...existing, ...w } : { ...w, ...existing });
+            } else {
+                map.set(key, w);
+            }
+        });
+        return Array.from(map.values());
     },
 
     async getContentItems() {
         let remoteItems = [];
+        let userMetaItems = [];
+
         if (supabaseClient) {
             try {
                 const { data, error } = await supabaseClient
@@ -135,29 +221,33 @@ const db = {
                     `)
                     .order('title', { ascending: true });
                 
-                if (error) console.error("Error fetching content items:", error);
-                else if (data) remoteItems = data;
-            } catch(e) {
-                console.warn("Supabase fetch failed, using local storage fallback", e);
-            }
+                if (data && !error) remoteItems = data;
+            } catch(e) {}
+
+            try {
+                const user = await this.getCurrentUser();
+                if (user?.user_metadata?.tv_library && Array.isArray(user.user_metadata.tv_library)) {
+                    userMetaItems = user.user_metadata.tv_library;
+                }
+            } catch(e) {}
         }
 
-        // Merge remote items with local offline library items
         const localItems = this.getLocalLibrary();
-        const mergedMap = new Map();
-        
-        remoteItems.forEach(item => mergedMap.set(String(item.id), item));
-        localItems.forEach(item => {
-            if (!mergedMap.has(String(item.id))) {
-                mergedMap.set(String(item.id), item);
-            }
-        });
+        let merged = this.mergeLibrarySafely(localItems, userMetaItems);
+        merged = this.mergeLibrarySafely(merged, remoteItems);
 
-        return Array.from(mergedMap.values());
+        // Keep local storage fresh with resolved library
+        if (merged.length > 0) {
+            this.saveLocalLibrary(merged);
+        }
+
+        return merged;
     },
 
     async getUserWatchlist(userId) {
         let remoteList = [];
+        let userMetaWatch = [];
+
         if (userId && supabaseClient) {
             try {
                 const { data, error } = await supabaseClient
@@ -165,24 +255,26 @@ const db = {
                     .select('*')
                     .eq('user_id', userId);
                 
-                if (error) console.error("Error fetching watchlist:", error);
-                else if (data) remoteList = data;
-            } catch(e) {
-                console.warn("Watchlist fetch failed, using local fallback", e);
-            }
+                if (data && !error) remoteList = data;
+            } catch(e) {}
+
+            try {
+                const user = await this.getCurrentUser();
+                if (user?.user_metadata?.tv_watchlist && Array.isArray(user.user_metadata.tv_watchlist)) {
+                    userMetaWatch = user.user_metadata.tv_watchlist;
+                }
+            } catch(e) {}
         }
 
-        // Merge with local offline watchlist
         const localList = this.getLocalWatchlist();
-        const watchlistMap = new Map();
-        remoteList.forEach(w => watchlistMap.set(String(w.content_item_id), w));
-        localList.forEach(w => {
-            if (!watchlistMap.has(String(w.content_item_id))) {
-                watchlistMap.set(String(w.content_item_id), w);
-            }
-        });
+        let merged = this.mergeWatchlistSafely(localList, userMetaWatch);
+        merged = this.mergeWatchlistSafely(merged, remoteList);
 
-        return Array.from(watchlistMap.values());
+        if (merged.length > 0) {
+            this.saveLocalWatchlist(merged);
+        }
+
+        return merged;
     },
 
     // Updates
@@ -205,6 +297,11 @@ const db = {
             localList.push(updatedEntry);
         }
         this.saveLocalWatchlist(localList);
+
+        if (userId && userId !== 'guest') {
+            // Push to cloud user metadata immediately
+            this.pushLocalToCloud(userId);
+        }
 
         if (!userId || !supabaseClient) {
             return { data: [updatedEntry], error: null };
@@ -237,12 +334,20 @@ const db = {
         const rawId = String(contentItemId);
         
         // Remove from local library
-        const localLib = this.getLocalLibrary().filter(item => String(item.id) !== idStr && String(item.id) !== rawId);
+        const localLib = this.getLocalLibrary().filter(item => String(item.id) !== idStr && String(item.id) !== rawId && String(item.tmdb_id || '') !== rawId);
         this.saveLocalLibrary(localLib);
 
         // Remove from local watchlist
         const localWatchlist = this.getLocalWatchlist().filter(w => String(w.content_item_id) !== idStr && String(w.content_item_id) !== rawId);
         this.saveLocalWatchlist(localWatchlist);
+
+        // Sync cloud user metadata if authenticated
+        try {
+            const user = await this.getCurrentUser();
+            if (user) {
+                await this.pushLocalToCloud(user.id);
+            }
+        } catch (e) {}
 
         let error = null;
         if (supabaseClient) {
@@ -265,6 +370,10 @@ const db = {
         const rawId = String(contentItemId);
         const localList = this.getLocalWatchlist().filter(w => String(w.content_item_id) !== idStr && String(w.content_item_id) !== rawId);
         this.saveLocalWatchlist(localList);
+
+        if (userId && userId !== 'guest') {
+            this.pushLocalToCloud(userId);
+        }
 
         if (userId && supabaseClient) {
             try {
@@ -293,13 +402,21 @@ const db = {
         // Save to local library immediately
         const localLib = this.getLocalLibrary();
         const idStr = String(uuid);
-        const existingIdx = localLib.findIndex(item => String(item.id) === idStr || String(item.id) === String(itemData.id));
+        const existingIdx = localLib.findIndex(item => String(item.id) === idStr || String(item.id) === String(itemData.id) || String(item.tmdb_id || '') === String(itemData.id));
         if (existingIdx >= 0) {
             localLib[existingIdx] = itemToSave;
         } else {
             localLib.push(itemToSave);
         }
         this.saveLocalLibrary(localLib);
+
+        // Immediate cloud metadata push for authenticated users
+        try {
+            const user = await this.getCurrentUser();
+            if (user) {
+                this.pushLocalToCloud(user.id);
+            }
+        } catch (e) {}
 
         if (!supabaseClient) {
             return { data: [itemToSave], error: null };
@@ -318,8 +435,8 @@ const db = {
                 type: itemToSave.type || 'series_season',
                 release_year: itemToSave.release_year ? parseInt(itemToSave.release_year) : null,
                 poster_url: itemToSave.poster_url || null,
-                streaming_service_id: itemToSave.streaming_service_id || null,
-                franchise_id: itemToSave.franchise_id || null
+                streaming_service_id: null,
+                franchise_id: null
             };
 
             const { data, error } = await supabaseClient
@@ -338,37 +455,102 @@ const db = {
         }
     },
 
-    async syncLocalStorageToCloud(userId) {
+    async pushLocalToCloud(userId) {
         if (!userId || !supabaseClient) return;
         try {
             const localLib = this.getLocalLibrary();
-            for (const item of localLib) {
-                const uuid = toDeterministicUuid(item.id);
-                const payload = {
-                    id: uuid,
-                    title: item.title,
-                    type: item.type || 'series_season',
-                    release_year: item.release_year ? parseInt(item.release_year) : null,
-                    poster_url: item.poster_url || null,
-                    streaming_service_id: item.streaming_service_id || null,
-                    franchise_id: item.franchise_id || null
-                };
-                await supabaseClient.from('content_items').upsert(payload, { onConflict: 'id' });
-            }
             const localWatch = this.getLocalWatchlist();
-            for (const watch of localWatch) {
-                const uuid = toDeterministicUuid(watch.content_item_id);
-                await supabaseClient.from('user_watchlist').upsert({
-                    user_id: userId,
-                    content_item_id: uuid,
-                    status: watch.status,
-                    rating: watch.rating,
-                    updated_at: watch.updated_at || new Date().toISOString()
-                }, { onConflict: 'user_id,content_item_id' });
-            }
+            let localTaste = null;
+            try { localTaste = JSON.parse(localStorage.getItem('tv_taste_quiz_answers') || 'null'); } catch(e) {}
+
+            await supabaseClient.auth.updateUser({
+                data: {
+                    tv_library: localLib,
+                    tv_watchlist: localWatch,
+                    tv_taste_quiz: localTaste,
+                    last_synced_at: new Date().toISOString()
+                }
+            });
         } catch (e) {
-            console.warn("Cloud sync warning:", e);
+            console.warn("pushLocalToCloud error:", e);
         }
+    },
+
+    async syncCloudUserData(userId) {
+        if (!userId || !supabaseClient) return;
+        try {
+            // 1. Fetch user from Supabase to get latest cloud metadata
+            const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
+            if (userErr || !user) return;
+
+            const cloudLib = user.user_metadata?.tv_library || [];
+            const cloudWatch = user.user_metadata?.tv_watchlist || [];
+            const cloudTaste = user.user_metadata?.tv_taste_quiz || null;
+
+            // 2. Fetch local storage items
+            const localLib = this.getLocalLibrary();
+            const localWatch = this.getLocalWatchlist();
+            let localTaste = null;
+            try { localTaste = JSON.parse(localStorage.getItem('tv_taste_quiz_answers') || 'null'); } catch(e) {}
+
+            // 3. Non-destructively merge (Push Guard: empty fresh device never wipes cloud)
+            const mergedLib = this.mergeLibrarySafely(localLib, cloudLib);
+            const mergedWatch = this.mergeWatchlistSafely(localWatch, cloudWatch);
+            const mergedTaste = localTaste || cloudTaste;
+
+            // 4. Save merged state to localStorage
+            this.saveLocalLibrary(mergedLib);
+            this.saveLocalWatchlist(mergedWatch);
+            if (mergedTaste) {
+                try { localStorage.setItem('tv_taste_quiz_answers', JSON.stringify(mergedTaste)); } catch(e) {}
+            }
+
+            // 5. Push merged state back to cloud user_metadata
+            await supabaseClient.auth.updateUser({
+                data: {
+                    tv_library: mergedLib,
+                    tv_watchlist: mergedWatch,
+                    tv_taste_quiz: mergedTaste,
+                    last_synced_at: new Date().toISOString()
+                }
+            });
+
+            // 6. Secondary background attempt to populate database tables
+            try {
+                for (const item of mergedLib) {
+                    const uuid = toDeterministicUuid(item.id);
+                    await supabaseClient.from('content_items').upsert({
+                        id: uuid,
+                        title: item.title,
+                        type: item.type || 'series_season',
+                        release_year: item.release_year ? parseInt(item.release_year) : null,
+                        poster_url: item.poster_url || null,
+                        streaming_service_id: null,
+                        franchise_id: null
+                    }, { onConflict: 'id' });
+                }
+                for (const w of mergedWatch) {
+                    const uuid = toDeterministicUuid(w.content_item_id);
+                    await supabaseClient.from('user_watchlist').upsert({
+                        user_id: userId,
+                        content_item_id: uuid,
+                        status: w.status,
+                        rating: w.rating,
+                        updated_at: w.updated_at || new Date().toISOString()
+                    }, { onConflict: 'user_id,content_item_id' });
+                }
+            } catch (tblErr) {
+                // Secondary table sync is non-blocking
+            }
+
+            return { library: mergedLib, watchlist: mergedWatch, taste: mergedTaste };
+        } catch (e) {
+            console.warn("syncCloudUserData error:", e);
+        }
+    },
+
+    async syncLocalStorageToCloud(userId) {
+        return this.syncCloudUserData(userId);
     },
 
     async getSystemSetting(key) {

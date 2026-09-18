@@ -666,8 +666,62 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         pendingAdminCallback = null;
     }
+    // --- Device Differentiation & Multi-Platform Adaptation ---
+    function updateDeviceMetrics() {
+        const ua = navigator.userAgent || '';
+        const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const isIPhone = /iPhone|iPod/.test(ua);
+        const isIPad = /iPad/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1 && window.innerWidth >= 641);
+        
+        const width = window.innerWidth || document.documentElement.clientWidth || 0;
+        const height = window.innerHeight || document.documentElement.clientHeight || 0;
+        const isPortrait = height >= width;
+
+        let deviceType = 'desktop';
+        if (isIPhone || width <= 640) {
+            deviceType = 'phone';
+        } else if (isIPad || (width >= 641 && width <= 1024)) {
+            deviceType = 'tablet';
+        }
+
+        document.documentElement.dataset.device = deviceType;
+        document.documentElement.dataset.orientation = isPortrait ? 'portrait' : 'landscape';
+
+        // Orientation handling on phone
+        const orientationBanner = document.getElementById('phone-orientation-banner');
+        if (orientationBanner) {
+            if (deviceType === 'phone' && !isPortrait) {
+                orientationBanner.classList.add('visible');
+            } else {
+                orientationBanner.classList.remove('visible');
+            }
+        }
+
+        // Try locking orientation to portrait if on mobile PWA/supported browser
+        if (deviceType === 'phone' && screen.orientation && screen.orientation.lock) {
+            try {
+                screen.orientation.lock('portrait').catch(() => {});
+            } catch (e) {}
+        }
+    }
+
     async function init() {
         lockAdmin();
+        updateDeviceMetrics();
+        window.addEventListener('resize', updateDeviceMetrics, { passive: true });
+        window.addEventListener('orientationchange', updateDeviceMetrics, { passive: true });
+
+        // Auto re-sync when user returns or switches tabs
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible' && currentUser) {
+                try {
+                    await window.db.syncCloudUserData(currentUser.id);
+                    allContent = await window.db.getContentItems();
+                    await loadUserData();
+                } catch (e) {}
+            }
+        });
+
         window.db.onAuthStateChange(async (event, session) => {
             currentUser = session?.user || null;
             if (!currentUser) {
@@ -677,7 +731,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             updateAuthUI();
             if (currentUser) {
-                await window.db.syncLocalStorageToCloud(currentUser.id);
+                await window.db.syncCloudUserData(currentUser.id);
+                allContent = await window.db.getContentItems();
+                await healLibraryServices();
             }
             await loadUserData();
         });
@@ -685,7 +741,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUser = await window.db.getCurrentUser();
         updateAuthUI();
         if (currentUser) {
-            await window.db.syncLocalStorageToCloud(currentUser.id);
+            await window.db.syncCloudUserData(currentUser.id);
         }
         
         allServices = await window.db.getStreamingServices();
@@ -705,10 +761,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateAuthUI() {
         if (currentUser) {
             authStatusBadge.textContent = currentUser.email;
+            authStatusBadge.title = currentUser.email;
             authStatusBadge.classList.add('logged-in');
             authBtn.textContent = 'Logout';
         } else {
             authStatusBadge.textContent = 'Guest (Local)';
+            authStatusBadge.title = 'Guest Session (Local)';
             authStatusBadge.classList.remove('logged-in');
             authBtn.textContent = 'Login';
         }
