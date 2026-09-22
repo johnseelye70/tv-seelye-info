@@ -66,7 +66,7 @@ function forwardToRoku(targetIp, targetPath, callback) {
         path: targetPath,
         method: 'POST',
         headers: {
-            'User-Agent': 'SeelyeTV-Bridge/2.5.0',
+            'User-Agent': 'SeelyeTV-Bridge/2.6.0',
             'Content-Length': '0'
         },
         timeout: 4000
@@ -280,7 +280,7 @@ function startLocalHttpServer() {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
                 app: 'Seelye TV Roku Bridge',
-                version: '2.5.0',
+                version: '2.6.0',
                 status: isConnected ? 'online' : 'connecting',
                 hostIp: HOST_IP,
                 hostname: os.hostname(),
@@ -339,7 +339,7 @@ function startLocalHttpServer() {
 
 // Banner & startup
 console.log('===========================================================');
-console.log('       SEELYE TV - LOCAL ROKU HARDWARE BRIDGE (Beta 2.5.0)');
+console.log('       SEELYE TV - LOCAL ROKU HARDWARE BRIDGE (Beta 2.6.0)');
 console.log('===========================================================');
 console.log(`[Bridge] Local Host IP: ${HOST_IP}`);
 console.log(`[Bridge] Target Default Roku: 192.168.50.9:8060`);
