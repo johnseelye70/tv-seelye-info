@@ -1,6 +1,6 @@
 /**
  * Roku External Control Protocol (ECP) Client Engine
- * tv.seelye.info - Beta 2.5.0
+ * tv.seelye.info - Beta 2.6.0
  * 
  * Provides direct client-side LAN communication with Roku streaming devices.
  * Supports remote keypresses, app launching, universal search, and episode playback targeting.
@@ -18,9 +18,7 @@ const RokuECP = (function () {
         hulu: { id: '2285', name: 'Hulu', color: '#1ce783' },
         peacock: { id: '593099', name: 'Peacock', color: '#000000' },
         prime: { id: '13', name: 'Prime Video', color: '#00a8e1' },
-        appletv: { id: '551012', name: 'Apple TV+', color: '#000000' },
-        youtube: { id: '837', name: 'YouTube', color: '#ff0000' },
-        max: { id: '61322', name: 'Max', color: '#002be7' }
+        appletv: { id: '551012', name: 'Apple TV+', color: '#000000' }
     };
 
     // Supabase Realtime Relay Configuration

@@ -1,6 +1,6 @@
 /**
  * Seelye TV - Local Roku Hardware Bridge Daemon
- * tv.seelye.info - Beta 2.5.0
+ * tv.seelye.info - Beta 2.6.0
  * 
  * Bridges HTTPS web commands from mobile phones/iPads/browsers
  * over Supabase Realtime WebSocket to local Roku TVs on port 8060 (ECP).

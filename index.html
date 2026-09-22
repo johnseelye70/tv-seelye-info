@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2.5.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=2.5.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2.5.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2.6.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=2.6.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2.6.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=2.5.0">
+    <link rel="stylesheet" href="style.css?v=2.6.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -29,7 +29,7 @@
             <div class="logo-subline">
                 <span class="domain">tv.seelye.info</span>
                 <span class="logo-divider">•</span>
-                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 2.5.0</button>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 2.6.0</button>
             </div>
         </div>
         <div class="auth-section">
@@ -104,7 +104,6 @@
                     <button class="pill-btn" data-service="peacock">Peacock <span class="svc-count" id="svc-count-peacock"></span></button>
                     <button class="pill-btn" data-service="hulu">Hulu <span class="svc-count" id="svc-count-hulu"></span></button>
                     <button class="pill-btn" data-service="prime">Prime Video <span class="svc-count" id="svc-count-prime"></span></button>
-                    <button class="pill-btn" data-service="youtube">YouTube TV <span class="svc-count" id="svc-count-youtube"></span></button>
                     <button class="pill-btn" data-service="appletv">Apple TV+ <span class="svc-count" id="svc-count-appletv"></span></button>
                 </div>
 
@@ -128,7 +127,6 @@
                             <option value="hulu">Hulu</option>
                             <option value="peacock">Peacock</option>
                             <option value="prime">Prime Video</option>
-                            <option value="youtube">YouTube TV</option>
                             <option value="appletv">Apple TV+</option>
                         </select>
                     </div>
@@ -191,7 +189,6 @@
                     <button class="pill-btn" data-service="hulu">Hulu</button>
                     <button class="pill-btn" data-service="peacock">Peacock</button>
                     <button class="pill-btn" data-service="prime">Prime Video</button>
-                    <button class="pill-btn" data-service="youtube">YouTube TV</button>
                     <button class="pill-btn" data-service="appletv">Apple TV+</button>
                 </div>
 
@@ -205,7 +202,6 @@
                             <option value="hulu">Hulu</option>
                             <option value="peacock">Peacock</option>
                             <option value="prime">Prime Video</option>
-                            <option value="youtube">YouTube TV</option>
                             <option value="appletv">Apple TV+</option>
                         </select>
                     </div>
@@ -435,12 +431,6 @@
                             <button type="button" class="roku-channel-pill ch-appletv" data-channel="appletv" title="Launch Apple TV+">
                                 <span class="ch-name">Apple TV+</span>
                             </button>
-                            <button type="button" class="roku-channel-pill ch-youtube" data-channel="youtube" title="Launch YouTube">
-                                <span class="ch-name">YouTube</span>
-                            </button>
-                            <button type="button" class="roku-channel-pill ch-max" data-channel="max" title="Launch Max">
-                                <span class="ch-name">Max</span>
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -454,7 +444,7 @@
                     <div>
                         <div class="changelog-title-group">
                             <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
-                            <span class="changelog-current-badge">Beta 2.5.0</span>
+                            <span class="changelog-current-badge">Beta 2.6.0</span>
                         </div>
                         <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
                     </div>
@@ -467,8 +457,14 @@
                     <ul class="changelog-timeline-list">
                         <li class="changelog-entry">
                             <div class="changelog-entry-header">
-                                <span class="changelog-version-tag">Beta 2.5.0</span>
+                                <span class="changelog-version-tag">Beta 2.6.0</span>
                                 <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Roku Remote Channel Deck Pruning &amp; Universal Streaming Service Alignment:</strong> Aligned the virtual Roku remote control quick-launch dock and streaming service options across the entire application to the 6 core supported platforms (Netflix, Disney+, Hulu, Peacock, Prime Video, and Apple TV+). Removed the Max and YouTube quick-launch tiles from the remote and pruned extraneous YouTube / YouTube TV selectors from library provider filters, explore tabs, quick browse pills, manual show addition dropdowns, and recommendation heuristics.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 2.5.0</span>
                             </div>
                             <p class="changelog-desc"><strong>Multi-Device Tombstone Deletion Ledger &amp; Resilient Cross-Device Sync:</strong> Resolved cross-device deletion resurrection bugs where stale mobile browser local storage (iPhone) inadvertently repushed cleared library items back into Supabase cloud storage upon refresh. Engineered a dual-layer deletion tombstone ledger (<code>tv_hub_deleted_items</code> / <code>user_deleted_${userId}</code> in PostgreSQL <code>system_settings</code>) tracking deleted content UUIDs, TMDB IDs, and titles. Enforced strict <strong>Read-Only Data Fetching</strong> push guards so background syncs, tab focus events, and mobile page loads never trigger cloud push side-effects. Integrated real-time WebSocket sync broadcasting across active browser sessions via Supabase Realtime (<code>seelye-sync-relay</code>), immediately removing deleted shows on connected devices without requiring manual page reload.</p>
                         </li>
@@ -697,7 +693,6 @@
                         <button class="pill-btn quick-browse-btn" data-service="peacock" style="padding: 4px 10px; font-size: 0.78rem;">Peacock</button>
                         <button class="pill-btn quick-browse-btn" data-service="hulu" style="padding: 4px 10px; font-size: 0.78rem;">Hulu</button>
                         <button class="pill-btn quick-browse-btn" data-service="prime" style="padding: 4px 10px; font-size: 0.78rem;">Prime Video</button>
-                        <button class="pill-btn quick-browse-btn" data-service="youtube" style="padding: 4px 10px; font-size: 0.78rem;">YouTube TV</button>
                         <button class="pill-btn quick-browse-btn" data-service="appletv" style="padding: 4px 10px; font-size: 0.78rem;">Apple TV+</button>
                     </div>
                     <div id="tmdb-results-grid" class="tmdb-results"></div>
@@ -705,7 +700,7 @@
 
                 <!-- Custom Add -->
                 <div class="admin-card">
-                    <h3>Manual Add (e.g., YouTube TV)</h3>
+                    <h3>Manual Add</h3>
                     <div class="input-group">
                         <label>Title</label>
                         <input type="text" id="custom-title" placeholder="Show Name">
@@ -717,7 +712,6 @@
                     <div class="input-group">
                         <label>Service</label>
                         <select id="custom-service">
-                            <option value="youtube">YouTube TV</option>
                             <option value="netflix">Netflix</option>
                             <option value="hulu">Hulu</option>
                             <option value="disney">Disney+</option>
@@ -871,9 +865,9 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=2.5.0"></script>
-    <script src="db.js?v=2.5.0"></script>
-    <script src="roku.js?v=2.5.0"></script>
-    <script src="app.js?v=2.5.0"></script>
+    <script src="service_catalog.js?v=2.6.0"></script>
+    <script src="db.js?v=2.6.0"></script>
+    <script src="roku.js?v=2.6.0"></script>
+    <script src="app.js?v=2.6.0"></script>
 </body>
 </html>

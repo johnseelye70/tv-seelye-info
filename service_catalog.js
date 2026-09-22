@@ -332,50 +332,6 @@ window.SERVICE_CATALOG = {
       "overview": "A portrait into the mind of a dry-witted, sexual, angry, porn-watching, grief-riddled woman, trying ..."
     }
   ],
-  "youtube": [
-    {
-      "id": "254002",
-      "title": "Critical Role",
-      "year": "2015",
-      "poster": "https://image.tmdb.org/t/p/w500/keSNwdzmSgQzluKmqTI6kwDOFa7.jpg",
-      "overview": "Critical Role is a weekly actual play series that uses tabletop role-playing game mechanics as a mea..."
-    },
-    {
-      "id": "89180",
-      "title": "Dimension 20",
-      "year": "2018",
-      "poster": "https://image.tmdb.org/t/p/w500/8xZXCenM9n5HYyrgr5FcP2oHwdx.jpg",
-      "overview": "Heed the call of adventure and enter Dimension 20 where Game Master Brennan Lee Mulligan, joined by ..."
-    },
-    {
-      "id": "65701",
-      "title": "Good Mythical Morning",
-      "year": "2012",
-      "poster": "https://image.tmdb.org/t/p/w500/jMpBQr2aNOFAI6wsC47zsOG6qOh.jpg",
-      "overview": "Two \"Internetainers\" (Rhett & Link) go far out and do the weirdest things, giving you a daily dose o..."
-    },
-    {
-      "id": "1667",
-      "title": "Saturday Night Live",
-      "year": "1975",
-      "poster": "https://image.tmdb.org/t/p/w500/s1cZBqbMwAF3w8S3Yo0j5nr2Yuo.jpg",
-      "overview": "A late-night live television sketch comedy and variety show created by Lorne Michaels. The show's co..."
-    },
-    {
-      "id": "60625",
-      "title": "Rick and Morty",
-      "year": "2013",
-      "poster": "https://image.tmdb.org/t/p/w500/owhkU6KRqdXoUQpjV8uyZGPtX58.jpg",
-      "overview": "Follows a sociopathic genius scientist who drags his inherently timid grandson on adventures across ..."
-    },
-    {
-      "id": "2912",
-      "title": "Jeopardy!",
-      "year": "1984",
-      "poster": "https://image.tmdb.org/t/p/w500/hfz0IgebqGENG6ZnuqKQKMFk2vy.jpg",
-      "overview": "America's favorite quiz show where contestants are presented with general knowledge clues in the for..."
-    }
-  ],
   "appletv": [
     {
       "id": "97546",

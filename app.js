@@ -116,7 +116,6 @@ document.addEventListener('DOMContentLoaded', () => {
         hulu: { name: 'Hulu', networkId: '453' },
         peacock: { name: 'Peacock', networkId: '3353' },
         prime: { name: 'Prime Video', networkId: '1024' },
-        youtube: { name: 'YouTube TV', networkId: '247' },
         appletv: { name: 'Apple TV+', networkId: '2552' }
     };
 
@@ -353,7 +352,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (pName.includes('hulu')) return 'hulu';
                 if (pName.includes('peacock')) return 'peacock';
                 if (pName.includes('amazon') || pName.includes('prime')) return 'prime';
-                if (pName.includes('youtube')) return 'youtube';
             }
         }
 
@@ -368,7 +366,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (nId === '453' || nName.includes('hulu') || nId === '88' || nName.includes('fx')) return 'hulu';
                 if (nId === '3353' || nName.includes('peacock') || nId === '6' || nName.includes('nbc')) return 'peacock';
                 if (nId === '1024' || nName.includes('amazon') || nName.includes('prime')) return 'prime';
-                if (nId === '247' || nName.includes('youtube')) return 'youtube';
             }
         }
 
@@ -1099,9 +1096,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (serviceKey.includes('apple') || serviceKey.includes('appletv')) {
             return `https://tv.apple.com/us/search?term=${cleanTitle}`;
-        }
-        if (serviceKey.includes('youtube')) {
-            return `https://tv.youtube.com/search/${cleanTitle}`;
         }
         return `https://www.google.com/search?q=${encodeURIComponent(`watch ${title} season ${seasonNumber} episode ${episodeNumber} streaming US`)}`;
     }
@@ -2059,7 +2053,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cntComp) cntComp.textContent = completed;
 
         // Provider counts
-        ['netflix', 'disney', 'peacock', 'hulu', 'prime', 'youtube', 'appletv'].forEach(svc => {
+        ['netflix', 'disney', 'peacock', 'hulu', 'prime', 'appletv'].forEach(svc => {
             const el = document.getElementById(`svc-count-${svc}`);
             if (el) {
                 const count = allContent.filter(item => matchesServiceFilter(item, svc)).length;
@@ -2079,7 +2073,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (optComp) optComp.textContent = `📦 Archive (${completed})`;
         }
         if (mobileServiceSelect) {
-            ['netflix', 'disney', 'hulu', 'peacock', 'prime', 'youtube', 'appletv'].forEach(svc => {
+            ['netflix', 'disney', 'hulu', 'peacock', 'prime', 'appletv'].forEach(svc => {
                 const opt = mobileServiceSelect.querySelector(`option[value="${svc}"]`);
                 if (opt) {
                     const count = allContent.filter(item => matchesServiceFilter(item, svc)).length;
@@ -3012,7 +3006,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Detect service
             const rawSvc = (item.streaming_services?.name || item.mock_service || '').toLowerCase();
-            for (const key of ['netflix', 'disney', 'hulu', 'peacock', 'prime', 'youtube', 'appletv']) {
+            for (const key of ['netflix', 'disney', 'hulu', 'peacock', 'prime', 'appletv']) {
                 if (rawSvc.includes(key) || (key === 'appletv' && rawSvc.includes('apple'))) {
                     serviceCounts[key] = (serviceCounts[key] || 0) + 1;
                     break;
@@ -4561,7 +4555,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         <select class="admin-select-dropdown" id="service-${item.id}">
                             <option value="">None / Unknown</option>
                             ${serviceOptions}
-                            <option value="youtube" ${initialService === 'youtube' ? 'selected' : ''}>YouTube TV</option>
                             <option value="netflix" ${initialService === 'netflix' ? 'selected' : ''}>Netflix</option>
                             <option value="disney" ${initialService === 'disney' ? 'selected' : ''}>Disney+</option>
                             <option value="peacock" ${initialService === 'peacock' ? 'selected' : ''}>Peacock</option>
@@ -4629,7 +4622,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
-                const isCustomName = ['youtube', 'netflix', 'disney', 'peacock', 'hulu', 'prime', 'appletv'].includes(serviceId);
+                const isCustomName = ['netflix', 'disney', 'peacock', 'hulu', 'prime', 'appletv'].includes(serviceId);
                 const resolvedServiceName = isCustomName ? (serviceMeta[serviceId]?.name || serviceId) : (serviceId || 'Unknown');
 
                 const payload = {
