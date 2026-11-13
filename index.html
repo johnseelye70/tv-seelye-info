@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Seelye TV Hub</title>
     <!-- App Favicon & Device Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2.8.0">
-    <link rel="alternate icon" type="image/png" href="favicon.png?v=2.8.0">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2.8.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2.9.0">
+    <link rel="alternate icon" type="image/png" href="favicon.png?v=2.9.0">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2.9.0">
     <meta name="theme-color" content="#070a12">
     <!-- Import Supabase via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="style.css?v=2.8.0">
+    <link rel="stylesheet" href="style.css?v=2.9.0">
 </head>
 <body>
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -29,7 +29,7 @@
             <div class="logo-subline">
                 <span class="domain">tv.seelye.info</span>
                 <span class="logo-divider">•</span>
-                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 2.8.0</button>
+                <button id="version-btn" class="version-badge-btn" type="button" title="View Version History (Admin Protected)">Beta 2.9.0</button>
             </div>
         </div>
         <div class="auth-section">
@@ -179,7 +179,7 @@
             <section class="explore-view-section">
                 <div class="view-header" style="margin-bottom: 20px;">
                     <h2 style="font-size: 1.6rem; margin-bottom: 4px;">Explore Streaming Services</h2>
-                    <p style="color: var(--text-muted); font-size: 0.95rem;">Browse popular and classic titles by provider. Add any title directly to your library with one click.</p>
+                    <p style="color: var(--text-muted); font-size: 0.95rem;">Browse updated releases, trending hits, and acclaimed series by provider. Add shows to your library or mark &ldquo;Not Interested&rdquo; to swap in fresh picks.</p>
                 </div>
 
                 <!-- Provider Selector -->
@@ -210,10 +210,11 @@
                 <!-- Service Discovery Header & Grid -->
                 <div class="service-discovery-section" id="service-discovery-container">
                     <div class="service-discovery-header">
-                        <div>
-                            <h3 id="service-discovery-title" style="font-size: 1.35rem; color: var(--text-main); margin-bottom: 4px;">Popular & Classic on Netflix</h3>
-                            <p id="service-discovery-subtitle" style="color: var(--text-muted); font-size: 0.92rem;">Iconic hits and acclaimed classics available on Netflix. Click any show or "+ Add" to add it to your library.</p>
+                        <div style="flex: 1; min-width: 240px;">
+                            <h3 id="service-discovery-title" style="font-size: 1.35rem; color: var(--text-main); margin-bottom: 4px;">Fresh, Trending &amp; Acclaimed on Netflix</h3>
+                            <p id="service-discovery-subtitle" style="color: var(--text-muted); font-size: 0.92rem;">Updated new releases, trending series, and favorites on Netflix. Add any show or mark &ldquo;Not Interested&rdquo; to swap in a fresh pick.</p>
                         </div>
+                        <div id="service-discovery-actions" class="service-discovery-actions"></div>
                     </div>
                     <div class="tmdb-results" id="service-discovery-grid">
                         <!-- Injected dynamically via app.js -->
@@ -444,7 +445,7 @@
                     <div>
                         <div class="changelog-title-group">
                             <h2 style="font-size: 1.6rem; margin: 0;">Version History &amp; Release Ledger</h2>
-                            <span class="changelog-current-badge">Beta 2.8.0</span>
+                            <span class="changelog-current-badge">Beta 2.9.0</span>
                         </div>
                         <p class="changelog-subtitle">Administrative audit log and complete architectural release history.</p>
                     </div>
@@ -457,8 +458,14 @@
                     <ul class="changelog-timeline-list">
                         <li class="changelog-entry">
                             <div class="changelog-entry-header">
-                                <span class="changelog-version-tag">Beta 2.8.0</span>
+                                <span class="changelog-version-tag">Beta 2.9.0</span>
                                 <span class="changelog-tag-pill">Latest</span>
+                            </div>
+                            <p class="changelog-desc"><strong>Explore Streaming Services &ldquo;Not Interested&rdquo; Swap-In &amp; Fresh Content Engine:</strong> Added a <strong>Not Interested</strong> dismissal action to every show across all 6 streaming platforms (Netflix, Disney+, Hulu, Peacock, Prime Video, Apple TV+) that syncs across devices and immediately slots a replacement show into its grid position until the pool is exhausted. Expanded the built-in catalog to ~30 interleaved new and classic shows per service, upgraded live TMDB discovery to query paginated recent releases (<code>first_air_date.gte=2024-01-01</code>) and US watch providers (<code>with_watch_providers</code>), and added a <strong>Fresh Picks</strong> refresh control alongside the hidden-show restore pill.</p>
+                        </li>
+                        <li class="changelog-entry">
+                            <div class="changelog-entry-header">
+                                <span class="changelog-version-tag">Beta 2.8.0</span>
                             </div>
                             <p class="changelog-desc"><strong>&ldquo;Not Interested&rdquo; Recommendation Dismissal &amp; Multi-Device Exclusion Ledger:</strong> Added a dedicated <strong>Not Interested</strong> button to every personalized recommendation card so dismissed shows are permanently excluded from future Smart Recommendations and starter gateway picks. Persists exclusions across devices via <code>tv_hub_not_interested</code>, batched <code>user_not_interested_${userId}</code> cloud records in PostgreSQL <code>system_settings</code>, and real-time Supabase WebSocket broadcast events, alongside a compact hidden-count restore pill in the recommendations header.</p>
                         </li>
@@ -877,9 +884,9 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="service_catalog.js?v=2.8.0"></script>
-    <script src="db.js?v=2.8.0"></script>
-    <script src="roku.js?v=2.8.0"></script>
-    <script src="app.js?v=2.8.0"></script>
+    <script src="service_catalog.js?v=2.9.0"></script>
+    <script src="db.js?v=2.9.0"></script>
+    <script src="roku.js?v=2.9.0"></script>
+    <script src="app.js?v=2.9.0"></script>
 </body>
 </html>

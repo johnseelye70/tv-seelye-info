@@ -43,6 +43,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let isLoginMode = true;
     let currentDiscoveryService = null;
     let serviceCache = {};
+    const serviceLiveLoaded = {};
+    const servicePageTracker = {};
+    const serviceFetching = {};
+    const serviceExhausted = {};
+    const EXPLORE_VISIBLE_LIMIT = 12;
     let tasteQuizAnswers = JSON.parse(localStorage.getItem('tv_taste_quiz_answers') || 'null');
     let isQuizActive = false;
     let currentQuizStep = 0;
@@ -105,18 +110,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const serviceDiscoveryGrid = document.getElementById('service-discovery-grid');
     const serviceDiscoveryTitle = document.getElementById('service-discovery-title');
     const serviceDiscoverySubtitle = document.getElementById('service-discovery-subtitle');
+    const serviceDiscoveryActions = document.getElementById('service-discovery-actions');
     const quickServiceRow = document.getElementById('quick-service-row');
     const imdbModal = document.getElementById('imdb-modal');
     const closeImdbModalBtn = document.getElementById('close-imdb-modal-btn');
     const imdbModalBody = document.getElementById('imdb-modal-body');
 
     const serviceMeta = {
-        netflix: { name: 'Netflix', networkId: '213' },
-        disney: { name: 'Disney+', networkId: '2739' },
-        hulu: { name: 'Hulu', networkId: '453' },
-        peacock: { name: 'Peacock', networkId: '3353' },
-        prime: { name: 'Prime Video', networkId: '1024' },
-        appletv: { name: 'Apple TV+', networkId: '2552' }
+        netflix: { name: 'Netflix', networkId: '213', providerId: '8' },
+        disney: { name: 'Disney+', networkId: '2739', providerId: '337' },
+        hulu: { name: 'Hulu', networkId: '453', providerId: '15' },
+        peacock: { name: 'Peacock', networkId: '3353', providerId: '386|387' },
+        prime: { name: 'Prime Video', networkId: '1024', providerId: '9' },
+        appletv: { name: 'Apple TV+', networkId: '2552', providerId: '350' }
     };
 
     // --- Smart Multi-Vector Recommendation Engine & Heuristics ---
@@ -809,11 +815,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     window.db.addNotInterestedItem(payload.item.id, payload.item.uuid, payload.item.tmdb_id, payload.item.title, false);
                 }
                 if (currentView === 'recommendations') renderSmartRecommendationsView();
+                if (currentView === 'explore') renderServiceDiscovery(currentExploreService, true);
             } else if (payload.event === 'rec-dismissed-cleared') {
                 if (window.db?.clearNotInterestedItems) {
                     window.db.clearNotInterestedItems(false);
                 }
                 if (currentView === 'recommendations') renderSmartRecommendationsView();
+                if (currentView === 'explore') renderServiceDiscovery(currentExploreService, true);
             }
         });
 
@@ -959,7 +967,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     mobileExploreSelect.value = targetService;
                 }
             }
-            renderServiceDiscovery(currentExploreService);
+            renderServiceDiscovery(currentExploreService, true);
         } else if (viewName === 'show-tracker') {
             window.scrollTo({ top: 0, behavior: 'smooth' });
             if (targetService) {
@@ -990,7 +998,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentView === 'recommendations') {
             renderSmartRecommendationsView();
         } else if (currentView === 'explore') {
-            renderServiceDiscovery(currentExploreService);
+            renderServiceDiscovery(currentExploreService, true);
         }
     }
 
@@ -2452,6 +2460,222 @@ document.addEventListener('DOMContentLoaded', () => {
     window.openImdbModal = openImdbModal;
 
     // --- Service Discovery Logic ---
+    function getEligibleServiceShows(service) {
+        const pool = serviceCache[service] || [];
+        const notInterestedSet = window.db?.getLocalNotInterestedIds ? window.db.getLocalNotInterestedIds() : new Set();
+        return pool.filter(item => !(window.db?.isNotInterested && window.db.isNotInterested(item, notInterestedSet)));
+    }
+
+    function renderDiscoveryHeaderActions(service) {
+        const actionsEl = serviceDiscoveryActions || document.getElementById('service-discovery-actions');
+        if (!actionsEl || (currentExploreService && currentExploreService !== service)) return;
+
+        const dismissedList = window.db?.getLocalNotInterestedItems ? window.db.getLocalNotInterestedItems() : [];
+        const sMeta = serviceMeta[service] || { name: 'this service' };
+        const isBusy = Boolean(serviceFetching[service]);
+
+        actionsEl.innerHTML = `
+            <button type="button" class="btn secondary-btn explore-fresh-btn" id="explore-fresh-btn" ${isBusy ? 'disabled' : ''} title="Load new releases &amp; rotate fresh ${sMeta.name} picks">
+                ${isBusy ? '⏳ Loading...' : '🔄 Fresh Picks'}
+            </button>
+            ${dismissedList.length > 0
+                ? `<button type="button" id="restore-dismissed-explore-btn" class="restore-dismissed-recs-btn" title="Restore shows you marked Not Interested">🚫 ${dismissedList.length} Hidden • Restore</button>`
+                : ''
+            }
+        `;
+
+        document.getElementById('explore-fresh-btn')?.addEventListener('click', () => {
+            cycleFreshServiceShows(service);
+        });
+
+        document.getElementById('restore-dismissed-explore-btn')?.addEventListener('click', () => {
+            if (confirm(`Restore all ${dismissedList.length} show${dismissedList.length === 1 ? '' : 's'} you marked "Not Interested"?`)) {
+                window.db?.clearNotInterestedItems?.(true);
+                showToast('Restored hidden shows across Explore & Recommendations.', 'info');
+                renderServiceDiscovery(service, true);
+            }
+        });
+    }
+
+    async function fetchMoreServiceShows(service, options = {}) {
+        const { topUpVisibleGrid = false, promoteToFront = false } = options;
+        const sMeta = serviceMeta[service];
+        if (!sMeta || serviceFetching[service] || serviceExhausted[service]) return 0;
+
+        const cloudKey = await getTmdbKey();
+        if (!cloudKey) return 0;
+
+        serviceFetching[service] = true;
+        renderDiscoveryHeaderActions(service);
+
+        let addedCount = 0;
+        try {
+            const nextPage = (servicePageTracker[service] || 0) + 1;
+            servicePageTracker[service] = nextPage;
+
+            const excludedGenres = '10763,10764,10766,10767'; // Skip News, Reality, Soap, Talk
+            const provFilter = sMeta.providerId
+                ? `with_watch_providers=${encodeURIComponent(sMeta.providerId)}&watch_region=US&with_watch_monetization_types=flatrate|free|ads`
+                : `with_networks=${sMeta.networkId}`;
+
+            const fetchJsonSafe = async (url) => {
+                try {
+                    const res = await fetch(url);
+                    return res.ok ? await res.json() : null;
+                } catch (e) {
+                    return null;
+                }
+            };
+
+            const [freshData, catalogData] = await Promise.all([
+                fetchJsonSafe(`https://api.themoviedb.org/3/discover/tv?api_key=${cloudKey}&${provFilter}&first_air_date.gte=2024-01-01&vote_count.gte=20&vote_average.gte=6.0&with_original_language=en&without_genres=${excludedGenres}&language=en-US&sort_by=popularity.desc&page=${nextPage}`),
+                fetchJsonSafe(`https://api.themoviedb.org/3/discover/tv?api_key=${cloudKey}&${provFilter}&vote_count.gte=40&vote_average.gte=6.2&with_original_language=en&without_genres=${excludedGenres}&language=en-US&sort_by=popularity.desc&page=${nextPage}`)
+            ]);
+
+            // Fallback to networkId if watch provider query returned empty on this page
+            let fallbackData = null;
+            if ((!freshData?.results?.length) && (!catalogData?.results?.length) && sMeta.networkId) {
+                fallbackData = await fetchJsonSafe(`https://api.themoviedb.org/3/discover/tv?api_key=${cloudKey}&with_networks=${sMeta.networkId}&without_genres=${excludedGenres}&vote_count.gte=25&language=en-US&sort_by=popularity.desc&page=${nextPage}`);
+            }
+
+            if (!Array.isArray(serviceCache[service])) {
+                serviceCache[service] = (window.SERVICE_CATALOG && window.SERVICE_CATALOG[service])
+                    ? [...window.SERVICE_CATALOG[service]]
+                    : [];
+            }
+
+            const existingIds = new Set(serviceCache[service].map(s => String(s.id)));
+            const existingTitles = new Set(serviceCache[service].map(s => (s.title || '').toLowerCase().trim()));
+            const notInterestedSet = window.db?.getLocalNotInterestedIds ? window.db.getLocalNotInterestedIds() : new Set();
+
+            const rawResults = [];
+            const freshList = freshData?.results || [];
+            const catList = catalogData?.results || [];
+            const fbList = fallbackData?.results || [];
+
+            // Interleave fresh 2024+ results ahead of general catalog hits
+            const maxLen = Math.max(freshList.length, catList.length, fbList.length);
+            for (let i = 0; i < maxLen; i++) {
+                if (freshList[i]) rawResults.push(freshList[i]);
+                if (catList[i]) rawResults.push(catList[i]);
+                if (fbList[i]) rawResults.push(fbList[i]);
+            }
+
+            const newShows = [];
+            rawResults.forEach(r => {
+                if (!r || !r.id || !r.name || !r.poster_path) return;
+                const idStr = String(r.id);
+                const tLower = (r.name || '').toLowerCase().trim();
+                if (existingIds.has(idStr) || existingTitles.has(tLower)) return;
+
+                const yr = r.first_air_date ? r.first_air_date.split('-')[0] : 'TBA';
+                const formatted = {
+                    id: idStr,
+                    title: r.name || 'Untitled',
+                    year: yr,
+                    poster: `https://image.tmdb.org/t/p/w500${r.poster_path}`,
+                    overview: r.overview ? (r.overview.length > 98 ? r.overview.slice(0, 98) + '...' : r.overview) : '',
+                    isFresh: (parseInt(yr, 10) || 0) >= 2024
+                };
+
+                if (window.db?.isNotInterested && window.db.isNotInterested(formatted, notInterestedSet)) {
+                    existingIds.add(idStr);
+                    return;
+                }
+
+                existingIds.add(idStr);
+                existingTitles.add(tLower);
+                newShows.push(formatted);
+            });
+
+            if (newShows.length > 0) {
+                addedCount = newShows.length;
+                if (promoteToFront) {
+                    serviceCache[service] = [...newShows, ...serviceCache[service]];
+                } else if (!serviceLiveLoaded[service]) {
+                    // On first live fetch, weave up to 4 fresh releases into the top visible slots and append the rest
+                    const leadFresh = newShows.filter(s => s.isFresh).slice(0, 4);
+                    const leadIds = new Set(leadFresh.map(s => s.id));
+                    const remainingNew = newShows.filter(s => !leadIds.has(s.id));
+                    const current = [...serviceCache[service]];
+                    leadFresh.forEach((freshShow, idx) => {
+                        const insertAt = Math.min(idx * 3, current.length);
+                        current.splice(insertAt, 0, freshShow);
+                    });
+                    serviceCache[service] = [...current, ...remainingNew];
+                } else {
+                    serviceCache[service] = [...serviceCache[service], ...newShows];
+                }
+            } else {
+                const maxPagesFresh = freshData?.total_pages || 0;
+                const maxPagesCat = catalogData?.total_pages || 0;
+                if (nextPage >= Math.max(maxPagesFresh, maxPagesCat, 1) || (freshList.length === 0 && catList.length === 0 && fbList.length === 0)) {
+                    serviceExhausted[service] = true;
+                }
+            }
+
+            serviceLiveLoaded[service] = true;
+
+            if (currentExploreService === service && currentView === 'explore') {
+                if (promoteToFront) {
+                    const eligible = getEligibleServiceShows(service);
+                    renderDiscoveryCards(eligible.slice(0, EXPLORE_VISIBLE_LIMIT), service);
+                } else if (topUpVisibleGrid && serviceDiscoveryGrid) {
+                    const currentCards = serviceDiscoveryGrid.querySelectorAll('.tmdb-result-card');
+                    if (currentCards.length < EXPLORE_VISIBLE_LIMIT) {
+                        const renderedIds = new Set(Array.from(currentCards).map(el => String(el.dataset.tmdbId)));
+                        const eligible = getEligibleServiceShows(service);
+                        const needed = EXPLORE_VISIBLE_LIMIT - currentCards.length;
+                        const toAppend = eligible.filter(s => !renderedIds.has(String(s.id))).slice(0, needed);
+                        toAppend.forEach(s => {
+                            const emptyState = serviceDiscoveryGrid.querySelector('.library-empty-provider-card');
+                            if (emptyState) emptyState.remove();
+                            serviceDiscoveryGrid.appendChild(createDiscoveryCardElement(s, service, sMeta.name));
+                        });
+                    }
+                } else if (!topUpVisibleGrid && addedCount > 0) {
+                    const eligible = getEligibleServiceShows(service);
+                    renderDiscoveryCards(eligible.slice(0, EXPLORE_VISIBLE_LIMIT), service);
+                }
+            }
+        } catch (err) {
+            console.warn("TMDB live discovery fetch error:", err);
+        } finally {
+            serviceFetching[service] = false;
+            if (currentExploreService === service) {
+                renderDiscoveryHeaderActions(service);
+            }
+        }
+        return addedCount;
+    }
+
+    async function cycleFreshServiceShows(service) {
+        const sMeta = serviceMeta[service] || { name: service };
+        const added = await fetchMoreServiceShows(service, { promoteToFront: true });
+
+        if (added === 0) {
+            // Rotate reserve/lower items to the top when live TMDB has no additional page
+            const pool = serviceCache[service] || [];
+            const notInterestedSet = window.db?.getLocalNotInterestedIds ? window.db.getLocalNotInterestedIds() : new Set();
+            const eligible = getEligibleServiceShows(service);
+            if (eligible.length > 1) {
+                const shiftCount = Math.min(EXPLORE_VISIBLE_LIMIT, Math.max(1, Math.floor(eligible.length / 2)));
+                const toMoveIds = new Set(eligible.slice(0, shiftCount).map(s => String(s.id)));
+                const head = pool.filter(s => !toMoveIds.has(String(s.id)) && !(window.db?.isNotInterested && window.db.isNotInterested(s, notInterestedSet)));
+                const moved = pool.filter(s => toMoveIds.has(String(s.id)));
+                const hidden = pool.filter(s => !toMoveIds.has(String(s.id)) && (window.db?.isNotInterested && window.db.isNotInterested(s, notInterestedSet)));
+                serviceCache[service] = [...head, ...moved, ...hidden];
+                const updatedEligible = getEligibleServiceShows(service);
+                renderDiscoveryCards(updatedEligible.slice(0, EXPLORE_VISIBLE_LIMIT), service);
+                showToast(`Refreshed ${sMeta.name} picks with more shows from the catalog.`, 'info');
+            } else {
+                showToast(`No more unseen shows available on ${sMeta.name}. Use Restore to bring back hidden picks.`, 'info');
+            }
+        } else {
+            showToast(`Loaded ${added} fresh picks for ${sMeta.name}!`, 'success');
+        }
+    }
+
     async function renderServiceDiscovery(service, forceRefresh = false) {
         if (!serviceDiscoveryContainer || !serviceDiscoveryGrid) return;
 
@@ -2465,63 +2689,37 @@ document.addEventListener('DOMContentLoaded', () => {
         serviceDiscoveryContainer.style.display = 'block';
 
         if (serviceDiscoveryTitle) {
-            serviceDiscoveryTitle.textContent = `Popular & Classic on ${sMeta.name}`;
+            serviceDiscoveryTitle.textContent = `Fresh, Trending & Acclaimed on ${sMeta.name}`;
         }
         if (serviceDiscoverySubtitle) {
-            serviceDiscoverySubtitle.textContent = `Iconic hits and acclaimed classics available on ${sMeta.name}. Click any show or "+ Add" to add it to your library.`;
+            serviceDiscoverySubtitle.textContent = `Updated new releases, trending series, and favorites on ${sMeta.name}. Add any show or mark "Not Interested" to swap in a fresh pick.`;
         }
 
-        if (!forceRefresh && currentDiscoveryService === service) {
+        if (!Array.isArray(serviceCache[service])) {
+            serviceCache[service] = (window.SERVICE_CATALOG && window.SERVICE_CATALOG[service])
+                ? [...window.SERVICE_CATALOG[service]]
+                : [];
+        }
+
+        const staleDismissedPresent = Array.from(serviceDiscoveryGrid.querySelectorAll('.tmdb-result-card')).some(el => {
+            const id = el.dataset.tmdbId;
+            return window.db?.isNotInterested && window.db.isNotInterested({ id, title: el.dataset.title });
+        });
+
+        if (!forceRefresh && currentDiscoveryService === service && !staleDismissedPresent) {
             updateDiscoveryInLibStatus();
+            renderDiscoveryHeaderActions(service);
             return;
         }
 
         currentDiscoveryService = service;
+        renderDiscoveryHeaderActions(service);
 
-        let shows = serviceCache[service];
-        if (!shows) {
-            shows = (window.SERVICE_CATALOG && window.SERVICE_CATALOG[service]) 
-                ? [...window.SERVICE_CATALOG[service]] 
-                : [];
-            serviceCache[service] = shows;
-        }
+        const eligible = getEligibleServiceShows(service);
+        renderDiscoveryCards(eligible.slice(0, EXPLORE_VISIBLE_LIMIT), service);
 
-        renderDiscoveryCards(shows, service);
-
-        // Optionally augment with live TMDB Discover popular items if API key is present
-        const cloudKey = await getTmdbKey();
-        if (cloudKey && sMeta.networkId && !serviceCache[service + '_live']) {
-            try {
-                const res = await fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${cloudKey}&with_networks=${sMeta.networkId}&watch_region=US&with_watch_monetization_types=flatrate|free|ads&language=en-US&sort_by=popularity.desc&page=1`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.results && data.results.length > 0) {
-                        const existingIds = new Set(shows.map(s => String(s.id)));
-                        const newShows = [];
-                        data.results.slice(0, 10).forEach(r => {
-                            if (!existingIds.has(String(r.id))) {
-                                newShows.push({
-                                    id: String(r.id),
-                                    title: r.name || 'Untitled',
-                                    year: r.first_air_date ? r.first_air_date.split('-')[0] : 'TBA',
-                                    poster: r.poster_path ? `https://image.tmdb.org/t/p/w500${r.poster_path}` : null,
-                                    overview: r.overview ? (r.overview.length > 95 ? r.overview.slice(0, 95) + '...' : r.overview) : ''
-                                });
-                            }
-                        });
-                        if (newShows.length > 0) {
-                            shows = [...shows, ...newShows];
-                            serviceCache[service] = shows;
-                            serviceCache[service + '_live'] = true;
-                            if (currentExploreService === service) {
-                                renderDiscoveryCards(shows, service);
-                            }
-                        }
-                    }
-                }
-            } catch (err) {
-                console.warn("TMDB live discovery fetch error:", err);
-            }
+        if (!serviceLiveLoaded[service] || (eligible.length < EXPLORE_VISIBLE_LIMIT + 6 && !serviceExhausted[service])) {
+            fetchMoreServiceShows(service, { topUpVisibleGrid: true });
         }
     }
 
@@ -2565,147 +2763,223 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function createDiscoveryCardElement(item, serviceId, sName) {
+        const fallbackPoster = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='450' viewBox='0 0 300 450'%3E%3Crect width='300' height='450' fill='%231e1e1e'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23666' font-family='sans-serif' font-size='16'%3ENo Poster%3C/text%3E%3C/svg%3E";
+        const rawPoster = item.poster || item.poster_path;
+        const poster = rawPoster ? (rawPoster.startsWith('http') ? rawPoster : `https://image.tmdb.org/t/p/w500${rawPoster}`) : fallbackPoster;
+        const year = item.year || (item.first_air_date ? item.first_air_date.split('-')[0] : 'TBA');
+        const yearNum = parseInt(year, 10) || 0;
+        const isFreshRelease = item.isFresh || yearNum >= 2024;
+        const showName = item.title || item.name || 'Untitled';
+        const cleanTitle = showName.replace(/"/g, '&quot;');
+        const overview = item.overview ? (item.overview.length > 95 ? item.overview.slice(0, 95) + '...' : item.overview) : '';
+
+        const tmdbId = String(item.id);
+        const uuid = window.db?.toDeterministicUuid ? window.db.toDeterministicUuid(tmdbId) : tmdbId;
+        const isAlreadyInLib = allContent.some(c =>
+            String(c.id) === uuid ||
+            String(c.tmdb_id) === tmdbId ||
+            String(c.id) === tmdbId ||
+            (c.title && c.title.toLowerCase() === showName.toLowerCase())
+        );
+
+        const card = document.createElement('div');
+        card.className = `tmdb-result-card ${isAlreadyInLib ? 'already-in-library' : ''}`;
+        card.dataset.tmdbId = tmdbId;
+        card.dataset.title = showName;
+
+        card.innerHTML = `
+            <div class="tmdb-poster-container" title="Click to view IMDb details" role="button" tabindex="0">
+                <img src="${poster}" class="tmdb-poster" alt="${cleanTitle}" loading="lazy" onerror="this.onerror=null;this.src='${fallbackPoster}';">
+                ${isAlreadyInLib ? '<span class="tmdb-badge-in-lib">✓ In Library</span>' : ''}
+                <span class="tmdb-badge-imdb-hint">IMDb Details ↗</span>
+            </div>
+            <div class="tmdb-info">
+                <div class="tmdb-title" title="${cleanTitle}">${showName}</div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 4px;">
+                    <span class="tmdb-year">${year}${isFreshRelease ? ' <span class="fresh-release-pill">Fresh</span>' : ''}</span>
+                    <span class="card-service-badge" style="position: static; font-size: 0.7rem; padding: 2px 6px;">${sName}</span>
+                </div>
+                ${overview ? `<div class="tmdb-overview">${overview}</div>` : ''}
+                <div class="rec-card-actions">
+                    <button type="button" class="btn primary-btn add-discovery-btn" style="width: 100%; font-size: 0.85rem;" data-tmdb-id="${item.id}" data-title="${cleanTitle}">
+                        ${isAlreadyInLib ? '✓ In Library' : '+ Add to Library'}
+                    </button>
+                    <button type="button" class="btn not-interested-rec-btn not-interested-discovery-btn" data-tmdb-id="${tmdbId}" data-title="${cleanTitle}" title="Hide this show and load another ${sName} pick in its place">
+                        🚫 Not Interested
+                    </button>
+                </div>
+            </div>
+        `;
+
+        const handleAddShow = async (btnEl) => {
+            if (card.classList.contains('adding')) return;
+
+            const currentInLib = allContent.some(c =>
+                String(c.id) === uuid ||
+                String(c.tmdb_id) === tmdbId ||
+                String(c.id) === tmdbId ||
+                (c.title && c.title.toLowerCase() === showName.toLowerCase())
+            );
+            if (currentInLib) {
+                showToast(`"${showName}" is already in your library!`, 'info');
+                return;
+            }
+
+            card.classList.add('adding');
+            if (btnEl) {
+                btnEl.textContent = 'Adding...';
+                btnEl.disabled = true;
+            }
+
+            const payload = {
+                id: uuid,
+                tmdb_id: tmdbId,
+                title: showName,
+                type: 'series_season',
+                release_year: parseInt(year) || null,
+                poster_url: poster,
+                streaming_service_id: null,
+                mock_service: sName
+            };
+
+            const { data, error } = await window.db.insertContentItem(payload);
+            if (error) {
+                showToast("Error adding show: " + error.message, 'error');
+                if (btnEl) {
+                    btnEl.textContent = 'Failed';
+                    btnEl.disabled = false;
+                }
+                card.classList.remove('adding');
+            } else {
+                const savedItem = (data && data[0]) ? data[0] : payload;
+                if (!allContent.some(c => String(c.id) === String(savedItem.id))) {
+                    allContent.push(savedItem);
+                }
+                await updateWatchState(savedItem.id, 'want_to_watch', null);
+
+                card.classList.remove('adding');
+                card.classList.add('already-in-library');
+                if (btnEl) {
+                    btnEl.textContent = '✓ Added!';
+                    btnEl.style.background = 'var(--success-color)';
+                    btnEl.disabled = true;
+                }
+                const badge = card.querySelector('.tmdb-badge-in-lib');
+                if (!badge) {
+                    const newBadge = document.createElement('span');
+                    newBadge.className = 'tmdb-badge-in-lib';
+                    newBadge.textContent = '✓ In Library';
+                    card.querySelector('.tmdb-poster-container')?.prepend(newBadge);
+                }
+                updateLibraryCounters();
+                showToast(`Added "${payload.title}" to your library!`, 'success');
+            }
+        };
+
+        const posterContainer = card.querySelector('.tmdb-poster-container');
+        if (posterContainer) {
+            posterContainer.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openImdbModal({ ...item, title: showName, poster, year, service: currentDiscoveryService });
+            });
+            posterContainer.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openImdbModal({ ...item, title: showName, poster, year, service: currentDiscoveryService });
+                }
+            });
+        }
+
+        const addBtn = card.querySelector('.add-discovery-btn');
+        if (addBtn) {
+            addBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleAddShow(addBtn);
+            });
+        }
+
+        const notInterestedBtn = card.querySelector('.not-interested-discovery-btn');
+        if (notInterestedBtn) {
+            notInterestedBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (card.classList.contains('dismissing')) return;
+                card.classList.add('dismissing');
+
+                if (window.db?.addNotInterestedItem) {
+                    window.db.addNotInterestedItem(item, uuid, tmdbId, showName);
+                }
+
+                setTimeout(() => {
+                    if (!serviceDiscoveryGrid) return;
+                    const eligible = getEligibleServiceShows(serviceId);
+                    const currentlyRenderedIds = new Set();
+                    Array.from(serviceDiscoveryGrid.querySelectorAll('.tmdb-result-card')).forEach(el => {
+                        if (el !== card && el.dataset.tmdbId) {
+                            currentlyRenderedIds.add(String(el.dataset.tmdbId));
+                        }
+                    });
+
+                    const replacement = eligible.find(candidate => !currentlyRenderedIds.has(String(candidate.id)));
+                    if (replacement) {
+                        const replacementCard = createDiscoveryCardElement(replacement, serviceId, sName);
+                        card.replaceWith(replacementCard);
+                        showToast(`Hidden "${showName}". Swapped in "${replacement.title || replacement.name}".`, 'info');
+                    } else {
+                        card.remove();
+                        if (serviceDiscoveryGrid.querySelectorAll('.tmdb-result-card').length === 0) {
+                            renderDiscoveryCards([], serviceId);
+                        }
+                        showToast(`Hidden "${showName}". No more ${sName} shows remaining in queue.`, 'info');
+                    }
+
+                    renderDiscoveryHeaderActions(serviceId);
+
+                    const renderedCount = serviceDiscoveryGrid.querySelectorAll('.tmdb-result-card').length;
+                    const remainingReserve = eligible.length - renderedCount;
+                    if (remainingReserve < 6 && !serviceExhausted[serviceId]) {
+                        fetchMoreServiceShows(serviceId, { topUpVisibleGrid: true });
+                    }
+                }, 180);
+            });
+        }
+
+        return card;
+    }
+
     function renderDiscoveryCards(shows, serviceId) {
         if (!serviceDiscoveryGrid) return;
         serviceDiscoveryGrid.innerHTML = '';
 
+        const sName = serviceMeta[serviceId]?.name || (serviceId ? serviceId.charAt(0).toUpperCase() + serviceId.slice(1) : 'Unknown');
+        const dismissedList = window.db?.getLocalNotInterestedItems ? window.db.getLocalNotInterestedItems() : [];
+
         if (!shows || shows.length === 0) {
-            serviceDiscoveryGrid.innerHTML = '<p style="color: var(--text-muted); grid-column: 1 / -1; padding: 20px 0; text-align: center;">No curated shows found for this service.</p>';
+            serviceDiscoveryGrid.innerHTML = `
+                <div class="library-empty-provider-card" style="grid-column: 1 / -1;">
+                    <h3>No More Shows Left on ${sName}</h3>
+                    <p style="color: var(--text-muted); margin-bottom: ${dismissedList.length > 0 ? '14px' : '0'};">
+                        ${serviceFetching[serviceId]
+                            ? `Checking ${sName} for additional fresh releases...`
+                            : `You've reviewed all available ${sName} shows in this stream.`}
+                    </p>
+                    ${dismissedList.length > 0
+                        ? `<button type="button" id="empty-restore-explore-btn" class="restore-dismissed-recs-btn">🚫 Restore ${dismissedList.length} Hidden Show${dismissedList.length === 1 ? '' : 's'}</button>`
+                        : ''
+                    }
+                </div>
+            `;
+            document.getElementById('empty-restore-explore-btn')?.addEventListener('click', () => {
+                window.db?.clearNotInterestedItems?.(true);
+                showToast('Restored hidden shows across Explore & Recommendations.', 'info');
+                renderServiceDiscovery(serviceId, true);
+            });
             return;
         }
 
-        const sName = serviceMeta[serviceId]?.name || (serviceId ? serviceId.charAt(0).toUpperCase() + serviceId.slice(1) : 'Unknown');
-        const fallbackPoster = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='450' viewBox='0 0 300 450'%3E%3Crect width='300' height='450' fill='%231e1e1e'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23666' font-family='sans-serif' font-size='16'%3ENo Poster%3C/text%3E%3C/svg%3E";
-
         shows.forEach(item => {
-            const rawPoster = item.poster || item.poster_path;
-            const poster = rawPoster ? (rawPoster.startsWith('http') ? rawPoster : `https://image.tmdb.org/t/p/w500${rawPoster}`) : fallbackPoster;
-            const year = item.year || (item.first_air_date ? item.first_air_date.split('-')[0] : 'TBA');
-            const showName = item.title || item.name || 'Untitled';
-            const cleanTitle = showName.replace(/"/g, '&quot;');
-            const overview = item.overview ? (item.overview.length > 95 ? item.overview.slice(0, 95) + '...' : item.overview) : '';
-
-            const tmdbId = String(item.id);
-            const uuid = window.db?.toDeterministicUuid ? window.db.toDeterministicUuid(tmdbId) : tmdbId;
-            const isAlreadyInLib = allContent.some(c => 
-                String(c.id) === uuid || 
-                String(c.tmdb_id) === tmdbId || 
-                String(c.id) === tmdbId || 
-                (c.title && c.title.toLowerCase() === showName.toLowerCase())
-            );
-
-            const card = document.createElement('div');
-            card.className = `tmdb-result-card ${isAlreadyInLib ? 'already-in-library' : ''}`;
-            card.dataset.tmdbId = tmdbId;
-            card.dataset.title = showName;
-
-            card.innerHTML = `
-                <div class="tmdb-poster-container" title="Click to view IMDb details" role="button" tabindex="0">
-                    <img src="${poster}" class="tmdb-poster" alt="${cleanTitle}" loading="lazy" onerror="this.onerror=null;this.src='${fallbackPoster}';">
-                    ${isAlreadyInLib ? '<span class="tmdb-badge-in-lib">✓ In Library</span>' : ''}
-                    <span class="tmdb-badge-imdb-hint">IMDb Details ↗</span>
-                </div>
-                <div class="tmdb-info">
-                    <div class="tmdb-title" title="${cleanTitle}">${showName}</div>
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                        <span class="tmdb-year">${year}</span>
-                        <span class="card-service-badge" style="position: static; font-size: 0.7rem; padding: 2px 6px;">${sName}</span>
-                    </div>
-                    ${overview ? `<div class="tmdb-overview">${overview}</div>` : ''}
-                    <button class="btn primary-btn add-discovery-btn" style="margin-top: auto; width: 100%; font-size: 0.85rem;" data-tmdb-id="${item.id}" data-title="${cleanTitle}">
-                        ${isAlreadyInLib ? '✓ In Library' : '+ Add to Library'}
-                    </button>
-                </div>
-            `;
-
-            const handleAddShow = async (btnEl) => {
-                if (card.classList.contains('adding')) return;
-
-                const currentInLib = allContent.some(c => 
-                    String(c.id) === uuid || 
-                    String(c.tmdb_id) === tmdbId || 
-                    String(c.id) === tmdbId ||
-                    (c.title && c.title.toLowerCase() === showName.toLowerCase())
-                );
-                if (currentInLib) {
-                    showToast(`"${showName}" is already in your library!`, 'info');
-                    return;
-                }
-
-                card.classList.add('adding');
-                if (btnEl) {
-                    btnEl.textContent = 'Adding...';
-                    btnEl.disabled = true;
-                }
-
-                const payload = {
-                    id: uuid,
-                    tmdb_id: tmdbId,
-                    title: showName,
-                    type: 'series_season',
-                    release_year: parseInt(year) || null,
-                    poster_url: poster,
-                    streaming_service_id: null,
-                    mock_service: sName
-                };
-
-                const { data, error } = await window.db.insertContentItem(payload);
-                if (error) {
-                    showToast("Error adding show: " + error.message, 'error');
-                    if (btnEl) {
-                        btnEl.textContent = 'Failed';
-                        btnEl.disabled = false;
-                    }
-                    card.classList.remove('adding');
-                } else {
-                    const savedItem = (data && data[0]) ? data[0] : payload;
-                    if (!allContent.some(c => String(c.id) === String(savedItem.id))) {
-                        allContent.push(savedItem);
-                    }
-                    await updateWatchState(savedItem.id, 'want_to_watch', null);
-
-                    card.classList.remove('adding');
-                    card.classList.add('already-in-library');
-                    if (btnEl) {
-                        btnEl.textContent = '✓ Added!';
-                        btnEl.style.background = 'var(--success-color)';
-                        btnEl.disabled = true;
-                    }
-                    const badge = card.querySelector('.tmdb-badge-in-lib');
-                    if (!badge) {
-                        const newBadge = document.createElement('span');
-                        newBadge.className = 'tmdb-badge-in-lib';
-                        newBadge.textContent = '✓ In Library';
-                        card.querySelector('.tmdb-poster-container')?.prepend(newBadge);
-                    }
-                    showToast(`Added "${payload.title}" to your library!`, 'success');
-                }
-            };
-
-            const posterContainer = card.querySelector('.tmdb-poster-container');
-            if (posterContainer) {
-                posterContainer.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openImdbModal({ ...item, title: showName, poster, year, service: currentDiscoveryService });
-                });
-                posterContainer.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        openImdbModal({ ...item, title: showName, poster, year, service: currentDiscoveryService });
-                    }
-                });
-            }
-
-            const addBtn = card.querySelector('.add-discovery-btn');
-            if (addBtn) {
-                addBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    handleAddShow(addBtn);
-                });
-            }
-
-            serviceDiscoveryGrid.appendChild(card);
+            serviceDiscoveryGrid.appendChild(createDiscoveryCardElement(item, serviceId, sName));
         });
     }
 
@@ -3126,17 +3400,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function generateSmartRecommendationsList(profile) {
         const catalogItems = [];
+        const seenIds = new Set();
+        const addPoolItem = (svcKey, show) => {
+            if (!show || !show.id || seenIds.has(String(show.id))) return;
+            seenIds.add(String(show.id));
+            catalogItems.push({
+                ...show,
+                serviceKey: svcKey,
+                serviceName: serviceMeta[svcKey]?.name || svcKey
+            });
+        };
         if (window.SERVICE_CATALOG) {
             Object.entries(window.SERVICE_CATALOG).forEach(([svcKey, shows]) => {
-                shows.forEach(show => {
-                    catalogItems.push({
-                        ...show,
-                        serviceKey: svcKey,
-                        serviceName: serviceMeta[svcKey]?.name || svcKey
-                    });
-                });
+                shows.forEach(show => addPoolItem(svcKey, show));
             });
         }
+        Object.entries(serviceCache).forEach(([svcKey, shows]) => {
+            if (Array.isArray(shows) && serviceMeta[svcKey]) {
+                shows.forEach(show => addPoolItem(svcKey, show));
+            }
+        });
 
         // Filter out shows already in allContent or marked "Not Interested"
         const existingIds = new Set(allContent.map(c => String(c.id)));
@@ -3776,7 +4059,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 pill.classList.add('active');
                 currentExploreService = pill.dataset.service || 'netflix';
                 if (mobileExploreSelect) mobileExploreSelect.value = currentExploreService;
-                renderServiceDiscovery(currentExploreService);
+                renderServiceDiscovery(currentExploreService, true);
             });
         }
 
@@ -3813,7 +4096,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         btn.classList.toggle('active', (btn.dataset.service || 'netflix') === currentExploreService);
                     });
                 }
-                renderServiceDiscovery(currentExploreService);
+                renderServiceDiscovery(currentExploreService, true);
             });
         }
 
