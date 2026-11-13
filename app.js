@@ -449,9 +449,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function healLibraryServices() {
         if (!allContent || allContent.length === 0) return;
         let changed = false;
-        const cloudKey = await window.db.getSystemSetting('tmdb_api_key') || localStorage.getItem('tmdb_api_key');
+        const cloudKey = await getTmdbKey();
         const localLib = window.db.getLocalLibrary();
         let localLibUpdated = false;
+        let networkLookups = 0;
+        const MAX_NETWORK_HEAL_PER_PASS = 4;
 
         for (const item of allContent) {
             const currentService = item.streaming_services?.name || item.mock_service;
@@ -459,12 +461,23 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (isUnknown) {
                 let detectedKey = detectShowServiceSync(item);
-                if (!detectedKey && cloudKey && item.tmdb_id && !String(item.tmdb_id).startsWith('custom_')) {
+                if (!detectedKey && !item._healedChecked && !item.provider_checked && cloudKey && item.tmdb_id && !String(item.tmdb_id).startsWith('custom_') && networkLookups < MAX_NETWORK_HEAL_PER_PASS) {
+                    networkLookups++;
+                    item._healedChecked = true;
                     try {
-                        const res = await fetch(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${cloudKey}&language=en-US&append_to_response=watch/providers`);
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 3500);
+                        const res = await fetch(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${cloudKey}&language=en-US&append_to_response=watch/providers`, { signal: controller.signal });
+                        clearTimeout(timeoutId);
                         if (res.ok) {
                             const det = await res.json();
                             detectedKey = extractServiceFromTmdbDetails(det);
+                            item.provider_checked = true;
+                            const lIdx = localLib.findIndex(l => String(l.id) === String(item.id) || (l.title && l.title.toLowerCase() === (item.title || '').toLowerCase()));
+                            if (lIdx >= 0 && !detectedKey) {
+                                localLib[lIdx].provider_checked = true;
+                                localLibUpdated = true;
+                            }
                         }
                     } catch(e) {}
                 }
@@ -472,22 +485,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (detectedKey && serviceMeta[detectedKey]) {
                     const properName = serviceMeta[detectedKey].name;
                     item.mock_service = properName;
+                    item.provider_checked = true;
                     changed = true;
 
                     // Update local storage
                     const idx = localLib.findIndex(l => String(l.id) === String(item.id) || (l.title && l.title.toLowerCase() === (item.title || '').toLowerCase()));
                     if (idx >= 0) {
                         localLib[idx].mock_service = properName;
+                        localLib[idx].provider_checked = true;
                         localLibUpdated = true;
                     }
 
-                    // Update Supabase if available
-                    if (window.db?.supabaseClient && currentUser) {
+                    // Update Supabase if available (non-blocking)
+                    const sbClient = window.db?.getClient?.() || window.supabaseClient;
+                    if (sbClient && currentUser && !window.db?.isCloudOffline?.()) {
                         try {
                             const matchedSvc = allServices.find(s => s.name.toLowerCase().includes(detectedKey));
                             if (matchedSvc) {
                                 item.streaming_service_id = matchedSvc.id;
-                                window.db.supabaseClient.from('content_items').update({ streaming_service_id: matchedSvc.id }).eq('id', item.id).then(() => {});
+                                Promise.resolve(sbClient.from('content_items').update({ streaming_service_id: matchedSvc.id }).eq('id', item.id)).catch(() => {});
                             }
                         } catch(e) {}
                     }
@@ -733,15 +749,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    let _initialSyncRunning = false;
+
     async function init() {
         lockAdmin();
         updateDeviceMetrics();
         window.addEventListener('resize', updateDeviceMetrics, { passive: true });
         window.addEventListener('orientationchange', updateDeviceMetrics, { passive: true });
 
+        // 1. Instant 0ms Local-First Hydration & Event Binding (never blocked on cloud requests)
+        allServices = window.db.getLocalStreamingServices ? window.db.getLocalStreamingServices() : [];
+        allContent = window.db.getLocalLibrary ? window.db.getLocalLibrary() : [];
+        userWatchlist = window.db.getLocalWatchlist ? window.db.getLocalWatchlist() : [];
+
+        setupEventListeners();
+        updateAuthUI();
+        renderAllSections();
+
+        // 2. Background Multi-Device Listeners
         // Auto re-sync when user returns or switches tabs (Read-only data fetch, zero push)
         document.addEventListener('visibilitychange', async () => {
-            if (document.visibilityState === 'visible' && currentUser) {
+            if (document.visibilityState === 'visible' && currentUser && !_initialSyncRunning) {
                 try {
                     await window.db.syncCloudUserData(currentUser.id, currentUser.email, false);
                     allContent = await window.db.getContentItems();
@@ -787,32 +815,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (currentView === 'changelog') switchView('library');
             }
             updateAuthUI();
-            if (currentUser && event === 'SIGNED_IN') {
+            if (currentUser && event === 'SIGNED_IN' && !_initialSyncRunning) {
                 try {
                     await window.db.syncCloudUserData(currentUser.id, currentUser.email, false);
                     allContent = await window.db.getContentItems();
-                    await healLibraryServices();
                     await loadUserData();
+                    healLibraryServices().catch(() => {});
                 } catch (e) {
                     console.warn("Auth change sync error:", e);
                 }
-            } else if (!currentUser) {
+            } else if (!currentUser && !_initialSyncRunning) {
                 await loadUserData();
             }
         });
 
-        currentUser = await window.db.getCurrentUser();
-        updateAuthUI();
-        if (currentUser) {
-            await window.db.syncCloudUserData(currentUser.id, currentUser.email, false);
-        }
-        
-        allServices = await window.db.getStreamingServices();
-        allContent = await window.db.getContentItems();
-        await healLibraryServices();
+        // 3. Asynchronous Non-Blocking Cloud Sync & Service Healing
+        _initialSyncRunning = true;
+        (async () => {
+            try {
+                currentUser = await window.db.getCurrentUser();
+                updateAuthUI();
+                if (currentUser) {
+                    await window.db.syncCloudUserData(currentUser.id, currentUser.email, false);
+                }
 
-        await loadUserData();
-        setupEventListeners();
+                const [remoteServices, mergedContent] = await Promise.all([
+                    window.db.getStreamingServices(),
+                    window.db.getContentItems()
+                ]);
+                if (Array.isArray(remoteServices) && remoteServices.length > 0) {
+                    allServices = remoteServices;
+                }
+                allContent = mergedContent;
+                userWatchlist = await window.db.getUserWatchlist(currentUser ? currentUser.id : null);
+                renderAllSections();
+
+                // Non-blocking background service healing
+                healLibraryServices().catch(() => {});
+            } catch (e) {
+                console.warn("Background init sync warning:", e);
+            } finally {
+                _initialSyncRunning = false;
+            }
+        })();
     }
 
     async function loadUserData() {
@@ -962,7 +1007,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const seasonEpisodesCache = {};
 
     async function getTmdbKey() {
-        return (await window.db.getSystemSetting('tmdb_api_key')) || localStorage.getItem('tmdb_api_key') || '';
+        const localKey = localStorage.getItem('tmdb_api_key');
+        if (localKey) return localKey;
+        const cloudKey = await window.db.getSystemSetting('tmdb_api_key');
+        if (cloudKey) {
+            localStorage.setItem('tmdb_api_key', cloudKey);
+            return cloudKey;
+        }
+        return '';
     }
 
     async function fetchShowSeasonsData(showItem) {
@@ -2148,7 +2200,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let details = null;
         let imdbId = null;
-        const key = await window.db.getSystemSetting('tmdb_api_key') || localStorage.getItem('tmdb_api_key');
+        const key = await getTmdbKey();
 
         if (key && tmdbId && !tmdbId.startsWith('custom_')) {
             try {
@@ -2427,7 +2479,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderDiscoveryCards(shows, service);
 
         // Optionally augment with live TMDB Discover popular items if API key is present
-        const cloudKey = await window.db.getSystemSetting('tmdb_api_key') || localStorage.getItem('tmdb_api_key');
+        const cloudKey = await getTmdbKey();
         if (cloudKey && sMeta.networkId && !serviceCache[service + '_live']) {
             try {
                 const res = await fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${cloudKey}&with_networks=${sMeta.networkId}&watch_region=US&with_watch_monetization_types=flatrate|free|ads&language=en-US&sort_by=popularity.desc&page=1`);
@@ -3821,13 +3873,12 @@ document.addEventListener('DOMContentLoaded', () => {
         settingsBtn.addEventListener('click', () => {
             requireAdminAuth(async () => {
                 settingsModal.classList.remove('hidden');
-                const cloudKey = await window.db.getSystemSetting('tmdb_api_key');
-                if (cloudKey) {
-                    tmdbApiKeyInput.value = cloudKey;
-                    localStorage.setItem('tmdb_api_key', cloudKey);
+                const localKey = localStorage.getItem('tmdb_api_key');
+                if (localKey) {
+                    tmdbApiKeyInput.value = localKey;
                 } else {
-                    const savedKey = localStorage.getItem('tmdb_api_key');
-                    if (savedKey) tmdbApiKeyInput.value = savedKey;
+                    const cloudKey = await getTmdbKey();
+                    if (cloudKey) tmdbApiKeyInput.value = cloudKey;
                 }
 
                 // Populate Roku Device Settings
@@ -3875,6 +3926,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 forceCloudSyncBtn.disabled = true;
                 forceCloudSyncBtn.textContent = 'Syncing...';
                 try {
+                    if (window.db.resetCircuitBreaker) window.db.resetCircuitBreaker();
                     showToast('Syncing with cloud PostgreSQL store...', 'info', 2500);
                     await window.db.syncCloudUserData(currentUser.id, currentUser.email);
                     allContent = await window.db.getContentItems();
@@ -4139,7 +4191,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         tmdbSearchBtn.addEventListener('click', async () => {
             const query = tmdbSearchQuery.value.trim();
-            const key = await window.db.getSystemSetting('tmdb_api_key') || localStorage.getItem('tmdb_api_key');
+            const key = await getTmdbKey();
             
             if (!key) {
                 showToast("Please set your TMDB API Key in Settings first.", 'error');
@@ -4516,6 +4568,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const serviceOptions = allServices.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
         const fallbackPoster = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='450' viewBox='0 0 300 450'%3E%3Crect width='300' height='450' fill='%231e1e1e'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23666' font-family='sans-serif' font-size='16'%3ENo Poster%3C/text%3E%3C/svg%3E";
+        let providerFetchCount = 0;
 
         results.slice(0, 24).forEach(item => {
             const rawPoster = item.poster || item.poster_path;
@@ -4570,24 +4623,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
 
-            // Background provider enrichment if not known upfront
-            if (!detectedKey) {
+            // Throttled background provider enrichment if not known upfront (max 8 concurrent/staggered)
+            if (!detectedKey && providerFetchCount < 8) {
                 const cloudKey = localStorage.getItem('tmdb_api_key');
                 if (cloudKey && !tmdbId.startsWith('custom_')) {
-                    fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${cloudKey}&language=en-US&append_to_response=watch/providers`)
-                        .then(r => r.ok ? r.json() : null)
-                        .then(det => {
-                            if (det) {
-                                const asyncKey = extractServiceFromTmdbDetails(det);
-                                if (asyncKey) {
-                                    const sel = document.getElementById(`service-${item.id}`);
-                                    if (sel && (!sel.value || sel.value === '')) {
-                                        sel.value = asyncKey;
+                    const staggerIdx = providerFetchCount++;
+                    setTimeout(() => {
+                        fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${cloudKey}&language=en-US&append_to_response=watch/providers`)
+                            .then(r => r.ok ? r.json() : null)
+                            .then(det => {
+                                if (det) {
+                                    const asyncKey = extractServiceFromTmdbDetails(det);
+                                    if (asyncKey) {
+                                        const sel = document.getElementById(`service-${item.id}`);
+                                        if (sel && (!sel.value || sel.value === '')) {
+                                            sel.value = asyncKey;
+                                        }
                                     }
                                 }
-                            }
-                        })
-                        .catch(() => {});
+                            })
+                            .catch(() => {});
+                    }, staggerIdx * 80);
                 }
             }
 
@@ -4610,7 +4666,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let serviceId = serviceSelect?.value || initialService || detectShowServiceSync(item) || '';
 
                 if (!serviceId) {
-                    const key = await window.db.getSystemSetting('tmdb_api_key') || localStorage.getItem('tmdb_api_key');
+                    const key = await getTmdbKey();
                     if (key && tmdbId && !tmdbId.startsWith('custom_')) {
                         try {
                             const detRes = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${key}&language=en-US&append_to_response=watch/providers`);

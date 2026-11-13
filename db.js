@@ -5,8 +5,55 @@ const SUPABASE_URL = window.ENV_SUPABASE_URL || 'https://nmawldbjspiefwcnykuk.su
 const SUPABASE_ANON_KEY = window.ENV_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tYXdsZGJqc3BpZWZ3Y255a3VrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0Njc5OTUsImV4cCI6MjEwMjA0Mzk5NX0.m67NQPyXjtbaoeXSUiUUUm8lbEJgO3NXJIlMeJTVnNU';
 
 let supabaseClient;
+let _cloudOfflineUntil = 0;
+let _cachedUser = undefined;
+let _cachedUserTs = 0;
+let _cloudDataCache = null;
+let _cloudDataCacheKey = '';
+let _cloudDataCacheTs = 0;
+let _cloudDataInflight = null;
+let _pushDebounceTimer = null;
+
+function isCloudOffline() {
+    return Date.now() < _cloudOfflineUntil;
+}
+
+function resetCloudCircuitBreaker() {
+    _cloudOfflineUntil = 0;
+    _cloudDataCache = null;
+    _cloudDataCacheTs = 0;
+}
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('online', () => resetCloudCircuitBreaker());
+}
+
+async function fetchWithTimeout(resource, options = {}) {
+    if (isCloudOffline()) {
+        throw new Error('Cloud circuit breaker active (offline cooldown)');
+    }
+    const controller = new AbortController();
+    const timeoutMs = 4500;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    if (options.signal) {
+        options.signal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+    try {
+        const response = await fetch(resource, { ...options, signal: controller.signal });
+        clearTimeout(timer);
+        return response;
+    } catch (err) {
+        clearTimeout(timer);
+        // Activate 30s circuit breaker on network / DNS / timeout errors so subsequent calls fail in 0ms
+        _cloudOfflineUntil = Date.now() + 30000;
+        throw err;
+    }
+}
+
 try {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: { fetch: fetchWithTimeout }
+    });
     window.supabaseClient = supabaseClient;
 } catch (e) {
     console.error("Supabase Initialization Error. Please ensure SUPABASE_URL starts with https://", e);
@@ -35,11 +82,18 @@ function toDeterministicUuid(id) {
 const db = {
     toDeterministicUuid,
     getClient: () => supabaseClient,
+    resetCircuitBreaker: resetCloudCircuitBreaker,
+    isCloudOffline,
     // Auth logic
     async login(email, password) {
         if (!supabaseClient) return { error: new Error('Database not connected. Please check your internet or ad-blocker.') };
+        resetCloudCircuitBreaker();
         try {
             const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (!error) {
+                _cachedUser = data?.user || null;
+                _cachedUserTs = Date.now();
+            }
             return { data, error };
         } catch (e) {
             return { error: e };
@@ -48,6 +102,7 @@ const db = {
 
     async signup(email, password) {
         if (!supabaseClient) return { error: new Error('Database not connected. Please check your internet or ad-blocker.') };
+        resetCloudCircuitBreaker();
         try {
             const { data, error } = await supabaseClient.auth.signUp({ email, password });
             return { data, error };
@@ -57,37 +112,74 @@ const db = {
     },
 
     async logout() {
+        _cachedUser = null;
+        _cachedUserTs = Date.now();
+        _cloudDataCache = null;
+        _cloudDataCacheTs = 0;
         const { error } = await supabaseClient.auth.signOut();
         return { error };
     },
 
-    async getCurrentUser() {
+    async getCurrentUser(forceRefresh = false) {
         if (!supabaseClient) return null;
+        if (!forceRefresh && _cachedUser !== undefined && (Date.now() - _cachedUserTs < 15000)) {
+            return _cachedUser;
+        }
+        try {
+            const { data: sessionData } = await supabaseClient.auth.getSession();
+            if (sessionData?.session?.user) {
+                _cachedUser = sessionData.session.user;
+                _cachedUserTs = Date.now();
+                return _cachedUser;
+            }
+        } catch (e) {}
+
+        if (isCloudOffline()) {
+            return _cachedUser || null;
+        }
+
         try {
             const { data, error } = await supabaseClient.auth.getUser();
             if (error) console.warn("Auth check:", error.message);
-            return data?.user || null;
+            _cachedUser = data?.user || null;
+            _cachedUserTs = Date.now();
+            return _cachedUser;
         } catch (e) {
             console.error("Error fetching user:", e);
-            return null;
+            return _cachedUser || null;
         }
     },
 
     onAuthStateChange(callback) {
         if (!supabaseClient) return;
         supabaseClient.auth.onAuthStateChange((event, session) => {
+            _cachedUser = session?.user || null;
+            _cachedUserTs = Date.now();
             callback(event, session);
         });
     },
 
+    getLocalStreamingServices() {
+        try {
+            const raw = localStorage.getItem('tv_hub_services_cache');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) { return []; }
+    },
+
     // Data Fetching Logic
     async getStreamingServices() {
-        if (!supabaseClient) return [];
+        const cached = this.getLocalStreamingServices();
+        if (!supabaseClient || isCloudOffline()) return cached;
         try {
             const { data, error } = await supabaseClient.from('streaming_services').select('*');
             if (error) console.error("Error fetching streaming services:", error);
-            return data || [];
-        } catch(e) { return []; }
+            if (Array.isArray(data) && data.length > 0) {
+                try { localStorage.setItem('tv_hub_services_cache', JSON.stringify(data)); } catch (e) {}
+                return data;
+            }
+            return data || cached;
+        } catch(e) { return cached; }
     },
 
     async getFranchises() {
@@ -343,129 +435,156 @@ const db = {
         return Array.from(map.values()).filter(w => !this.isTombstoned(w, deletedSet));
     },
 
-    async fetchUserCloudData(userId, email = null) {
-        if (!userId && !email) return { library: [], watchlist: [], taste: null, deleted: [], hasCloudRecord: false };
+    async fetchUserCloudData(userId, email = null, forceRefresh = false) {
+        const emptyResult = { library: [], watchlist: [], taste: null, deleted: [], hasCloudRecord: false };
+        if ((!userId && !email) || !supabaseClient || isCloudOffline()) return emptyResult;
 
-        let cloudLib = null;
-        let cloudWatch = null;
-        let cloudTaste = null;
-        let cloudDeleted = [];
-        let cloudLibFound = false;
-        let cloudWatchFound = false;
-
-        // 1. Query PostgreSQL system_settings by userId
-        if (userId && supabaseClient) {
-            try {
-                const delVal = await this.getSystemSetting(`user_deleted_${userId}`);
-                if (delVal) {
-                    const parsed = JSON.parse(delVal);
-                    if (Array.isArray(parsed)) cloudDeleted = parsed;
-                }
-
-                const libVal = await this.getSystemSetting(`user_library_${userId}`);
-                if (libVal !== null && libVal !== undefined) {
-                    const parsed = JSON.parse(libVal);
-                    if (Array.isArray(parsed)) {
-                        cloudLib = parsed;
-                        cloudLibFound = true;
-                    }
-                }
-
-                const watchVal = await this.getSystemSetting(`user_watchlist_${userId}`);
-                if (watchVal !== null && watchVal !== undefined) {
-                    const parsed = JSON.parse(watchVal);
-                    if (Array.isArray(parsed)) {
-                        cloudWatch = parsed;
-                        cloudWatchFound = true;
-                    }
-                }
-
-                const tasteVal = await this.getSystemSetting(`user_taste_${userId}`);
-                if (tasteVal) {
-                    const parsed = JSON.parse(tasteVal);
-                    if (parsed) cloudTaste = parsed;
-                }
-            } catch (e) {
-                console.warn("fetchUserCloudData settings by userId error:", e);
+        const cacheKey = `${userId || ''}:${email || ''}`;
+        if (!forceRefresh) {
+            if (_cloudDataInflight && _cloudDataCacheKey === cacheKey) {
+                return await _cloudDataInflight;
+            }
+            if (_cloudDataCache && _cloudDataCacheKey === cacheKey && (Date.now() - _cloudDataCacheTs < 5000)) {
+                return _cloudDataCache;
             }
         }
 
-        // 2. Query PostgreSQL system_settings by deterministic email hash if not found
-        if (email && !cloudLibFound && supabaseClient) {
-            try {
-                const emailKey = toDeterministicUuid('email:' + String(email).toLowerCase().trim());
-                if (cloudDeleted.length === 0) {
-                    const delVal = await this.getSystemSetting(`user_deleted_${emailKey}`);
-                    if (delVal) {
-                        const parsed = JSON.parse(delVal);
-                        if (Array.isArray(parsed)) cloudDeleted = parsed;
+        const runFetch = async () => {
+            let cloudLib = null;
+            let cloudWatch = null;
+            let cloudTaste = null;
+            let cloudDeleted = [];
+            let cloudLibFound = false;
+            let cloudWatchFound = false;
+
+            const keysToFetch = [];
+            const emailKey = email ? toDeterministicUuid('email:' + String(email).toLowerCase().trim()) : null;
+
+            if (userId) {
+                keysToFetch.push(
+                    `user_deleted_${userId}`,
+                    `user_library_${userId}`,
+                    `user_watchlist_${userId}`,
+                    `user_taste_${userId}`
+                );
+            }
+            if (emailKey) {
+                keysToFetch.push(
+                    `user_deleted_${emailKey}`,
+                    `user_library_${emailKey}`,
+                    `user_watchlist_${emailKey}`,
+                    `user_taste_${emailKey}`
+                );
+            }
+
+            if (keysToFetch.length > 0) {
+                try {
+                    const { data: rows, error } = await supabaseClient
+                        .from('system_settings')
+                        .select('id, value')
+                        .in('id', keysToFetch);
+
+                    if (!error && Array.isArray(rows)) {
+                        const rowMap = new Map(rows.map(r => [r.id, r.value]));
+
+                        const applyFromPrefix = (prefixId, onlyIfMissing = false) => {
+                            if (!prefixId) return;
+                            const delVal = rowMap.get(`user_deleted_${prefixId}`);
+                            if (delVal && (!onlyIfMissing || cloudDeleted.length === 0)) {
+                                try {
+                                    const parsed = JSON.parse(delVal);
+                                    if (Array.isArray(parsed)) cloudDeleted = parsed;
+                                } catch (e) {}
+                            }
+                            const libVal = rowMap.get(`user_library_${prefixId}`);
+                            if (libVal !== null && libVal !== undefined && (!onlyIfMissing || !cloudLibFound)) {
+                                try {
+                                    const parsed = JSON.parse(libVal);
+                                    if (Array.isArray(parsed)) {
+                                        cloudLib = parsed;
+                                        cloudLibFound = true;
+                                    }
+                                } catch (e) {}
+                            }
+                            const watchVal = rowMap.get(`user_watchlist_${prefixId}`);
+                            if (watchVal !== null && watchVal !== undefined && (!onlyIfMissing || !cloudWatchFound)) {
+                                try {
+                                    const parsed = JSON.parse(watchVal);
+                                    if (Array.isArray(parsed)) {
+                                        cloudWatch = parsed;
+                                        cloudWatchFound = true;
+                                    }
+                                } catch (e) {}
+                            }
+                            const tasteVal = rowMap.get(`user_taste_${prefixId}`);
+                            if (tasteVal && (!onlyIfMissing || !cloudTaste)) {
+                                try {
+                                    const parsed = JSON.parse(tasteVal);
+                                    if (parsed) cloudTaste = parsed;
+                                } catch (e) {}
+                            }
+                        };
+
+                        // 1. Primary lookup by userId
+                        applyFromPrefix(userId, false);
+                        // 2. Secondary fallback by deterministic email hash if any key missing
+                        applyFromPrefix(emailKey, true);
+                    } else if (error) {
+                        console.warn("fetchUserCloudData batched query warning:", error);
                     }
+                } catch (e) {
+                    console.warn("fetchUserCloudData settings batch error:", e);
                 }
-                const libVal = await this.getSystemSetting(`user_library_${emailKey}`);
-                if (libVal !== null && libVal !== undefined) {
-                    const parsed = JSON.parse(libVal);
-                    if (Array.isArray(parsed)) {
-                        cloudLib = parsed;
-                        cloudLibFound = true;
-                    }
-                }
-                if (!cloudWatchFound) {
-                    const watchVal = await this.getSystemSetting(`user_watchlist_${emailKey}`);
-                    if (watchVal !== null && watchVal !== undefined) {
-                        const parsed = JSON.parse(watchVal);
-                        if (Array.isArray(parsed)) {
-                            cloudWatch = parsed;
+            }
+
+            // 3. Fallback to Supabase Auth user_metadata only if never initialized in system_settings
+            if (!cloudLibFound || !cloudWatchFound) {
+                try {
+                    const user = await this.getCurrentUser();
+                    if (user?.user_metadata) {
+                        if (!cloudLibFound && Array.isArray(user.user_metadata.tv_library)) {
+                            cloudLib = user.user_metadata.tv_library;
+                            cloudLibFound = true;
+                        }
+                        if (!cloudWatchFound && Array.isArray(user.user_metadata.tv_watchlist)) {
+                            cloudWatch = user.user_metadata.tv_watchlist;
                             cloudWatchFound = true;
                         }
+                        if (cloudDeleted.length === 0 && Array.isArray(user.user_metadata.tv_deleted)) {
+                            cloudDeleted = user.user_metadata.tv_deleted;
+                        }
+                        if (!cloudTaste && user.user_metadata.tv_taste_quiz) {
+                            cloudTaste = user.user_metadata.tv_taste_quiz;
+                        }
                     }
-                }
-                if (!cloudTaste) {
-                    const tasteVal = await this.getSystemSetting(`user_taste_${emailKey}`);
-                    if (tasteVal) cloudTaste = JSON.parse(tasteVal);
-                }
-            } catch (e) {
-                console.warn("fetchUserCloudData settings by email error:", e);
+                } catch (e) {}
             }
-        }
 
-        // 3. Fallback to Supabase Auth user_metadata only if never initialized in system_settings
-        if (!cloudLibFound || !cloudWatchFound) {
-            try {
-                const user = await this.getCurrentUser();
-                if (user?.user_metadata) {
-                    if (!cloudLibFound && Array.isArray(user.user_metadata.tv_library)) {
-                        cloudLib = user.user_metadata.tv_library;
-                        cloudLibFound = true;
-                    }
-                    if (!cloudWatchFound && Array.isArray(user.user_metadata.tv_watchlist)) {
-                        cloudWatch = user.user_metadata.tv_watchlist;
-                        cloudWatchFound = true;
-                    }
-                    if (cloudDeleted.length === 0 && Array.isArray(user.user_metadata.tv_deleted)) {
-                        cloudDeleted = user.user_metadata.tv_deleted;
-                    }
-                    if (!cloudTaste && user.user_metadata.tv_taste_quiz) {
-                        cloudTaste = user.user_metadata.tv_taste_quiz;
-                    }
-                }
-            } catch (e) {}
-        }
-
-        return { 
-            library: cloudLib || [], 
-            watchlist: cloudWatch || [], 
-            taste: cloudTaste, 
-            deleted: cloudDeleted,
-            hasCloudRecord: cloudLibFound 
+            const result = {
+                library: cloudLib || [],
+                watchlist: cloudWatch || [],
+                taste: cloudTaste,
+                deleted: cloudDeleted,
+                hasCloudRecord: cloudLibFound
+            };
+            _cloudDataCache = result;
+            _cloudDataCacheKey = cacheKey;
+            _cloudDataCacheTs = Date.now();
+            return result;
         };
+
+        _cloudDataCacheKey = cacheKey;
+        _cloudDataInflight = runFetch().finally(() => {
+            _cloudDataInflight = null;
+        });
+        return await _cloudDataInflight;
     },
 
     async getContentItems() {
         let remoteItems = [];
         let cloudUserItems = [];
-        const deletedSet = this.getLocalDeletedIds();
 
-        if (supabaseClient) {
+        if (supabaseClient && !isCloudOffline()) {
             try {
                 const user = await this.getCurrentUser();
                 if (user) {
@@ -481,20 +600,22 @@ const db = {
                 }
             } catch(e) {}
 
-            try {
-                const { data, error } = await supabaseClient
-                    .from('content_items')
-                    .select(`
-                        *,
-                        streaming_services ( name, icon_url ),
-                        franchises ( name )
-                    `)
-                    .order('title', { ascending: true });
-                
-                if (data && !error) {
-                    remoteItems = data.filter(item => !this.isTombstoned(item));
-                }
-            } catch(e) {}
+            if (!isCloudOffline()) {
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('content_items')
+                        .select(`
+                            *,
+                            streaming_services ( name, icon_url ),
+                            franchises ( name )
+                        `)
+                        .order('title', { ascending: true });
+                    
+                    if (data && !error) {
+                        remoteItems = data.filter(item => !this.isTombstoned(item));
+                    }
+                } catch(e) {}
+            }
         }
 
         const localItems = this.getLocalLibrary();
@@ -511,7 +632,7 @@ const db = {
         let remoteList = [];
         let cloudUserWatch = [];
 
-        if (userId && supabaseClient) {
+        if (userId && supabaseClient && !isCloudOffline()) {
             try {
                 const user = await this.getCurrentUser();
                 const cloudData = await this.fetchUserCloudData(userId, user?.email);
@@ -525,16 +646,18 @@ const db = {
                 }
             } catch(e) {}
 
-            try {
-                const { data, error } = await supabaseClient
-                    .from('user_watchlist')
-                    .select('*')
-                    .eq('user_id', userId);
-                
-                if (data && !error) {
-                    remoteList = data.filter(w => !this.isTombstoned(w));
-                }
-            } catch(e) {}
+            if (!isCloudOffline()) {
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('user_watchlist')
+                        .select('*')
+                        .eq('user_id', userId);
+                    
+                    if (data && !error) {
+                        remoteList = data.filter(w => !this.isTombstoned(w));
+                    }
+                } catch(e) {}
+            }
         }
 
         const localList = this.getLocalWatchlist();
@@ -543,6 +666,18 @@ const db = {
 
         this.saveLocalWatchlist(merged);
         return merged;
+    },
+
+    scheduleCloudPush(userId, email = null) {
+        if (!userId || userId === 'guest' || !supabaseClient) return;
+        if (_pushDebounceTimer) clearTimeout(_pushDebounceTimer);
+        _pushDebounceTimer = setTimeout(async () => {
+            _pushDebounceTimer = null;
+            try {
+                const u = await this.getCurrentUser();
+                await this.pushLocalToCloud(userId, email || u?.email);
+            } catch (e) {}
+        }, 350);
     },
 
     // Updates
@@ -580,41 +715,35 @@ const db = {
         }
         this.saveLocalWatchlist(localList);
 
-        if (userId && userId !== 'guest') {
-            try {
-                const user = await this.getCurrentUser();
-                await this.pushLocalToCloud(userId, user?.email);
+        if (userId && userId !== 'guest' && supabaseClient) {
+            this.getCurrentUser().then(user => {
+                this.scheduleCloudPush(userId, user?.email);
                 this.broadcastSyncEvent({
                     event: 'watch-updated',
                     contentItemId: rawId,
                     uuid: uuid,
                     userId: userId
                 });
-            } catch(e) {}
+            }).catch(() => {});
+
+            if (!isCloudOffline()) {
+                Promise.resolve(
+                    supabaseClient
+                        .from('user_watchlist')
+                        .upsert({ 
+                            user_id: userId, 
+                            content_item_id: uuid, 
+                            status: status,
+                            rating: rating,
+                            updated_at: updatedEntry.updated_at
+                        }, { onConflict: 'user_id,content_item_id' })
+                ).then(({ error }) => {
+                    if (error) console.warn("Supabase upsert watchlist warning:", error);
+                }).catch(e => console.warn("Database watchlist exception:", e));
+            }
         }
 
-        if (!userId || !supabaseClient) {
-            return { data: [updatedEntry], error: null };
-        }
-        
-        try {
-            const { data, error } = await supabaseClient
-                .from('user_watchlist')
-                .upsert({ 
-                    user_id: userId, 
-                    content_item_id: uuid, 
-                    status: status,
-                    rating: rating,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'user_id,content_item_id' })
-                .select();
-                
-            if (error) console.warn("Supabase upsert watchlist warning:", error);
-            return { data: data || [updatedEntry], error: null };
-        } catch (e) {
-            console.warn("Database watchlist exception:", e);
-            return { data: [updatedEntry], error: null };
-        }
+        return { data: [updatedEntry], error: null };
     },
 
     // Delete / Remove Item from Library & Watchlist (Records Tombstone & Real-Time Sync)
@@ -646,32 +775,29 @@ const db = {
         );
         this.saveLocalWatchlist(localWatchlist);
 
-        // 5. Sync cloud PostgreSQL store if authenticated
-        let currentUserId = null;
-        try {
-            const user = await this.getCurrentUser();
-            if (user) {
-                currentUserId = user.id;
-                await this.pushLocalToCloud(user.id, user.email);
-                this.broadcastSyncEvent({
-                    event: 'item-deleted',
-                    id: rawId,
-                    uuid: uuid,
-                    tmdb_id: tmdbId,
-                    title: title,
-                    userId: user.id
-                });
-            }
-        } catch (e) {}
-
-        let error = null;
+        // 5. Non-blocking cloud push & relational cleanup if authenticated
         if (supabaseClient) {
-            try {
-                await supabaseClient.from('user_watchlist').delete().eq('content_item_id', uuid);
-                const res = await supabaseClient.from('content_items').delete().eq('id', uuid);
-                error = res.error;
-            } catch (e) {
-                error = e;
+            this.getCurrentUser().then(user => {
+                if (user) {
+                    this.scheduleCloudPush(user.id, user.email);
+                    this.broadcastSyncEvent({
+                        event: 'item-deleted',
+                        id: rawId,
+                        uuid: uuid,
+                        tmdb_id: tmdbId,
+                        title: title,
+                        userId: user.id
+                    });
+                }
+            }).catch(() => {});
+
+            if (!isCloudOffline()) {
+                (async () => {
+                    try {
+                        await supabaseClient.from('user_watchlist').delete().eq('content_item_id', uuid);
+                        await supabaseClient.from('content_items').delete().eq('id', uuid);
+                    } catch (e) {}
+                })();
             }
         }
         return { error: null };
@@ -686,29 +812,25 @@ const db = {
         const localList = this.getLocalWatchlist().filter(w => String(w.content_item_id) !== idStr && String(w.content_item_id) !== rawId);
         this.saveLocalWatchlist(localList);
 
-        if (userId && userId !== 'guest') {
-            try {
-                const user = await this.getCurrentUser();
-                await this.pushLocalToCloud(userId, user?.email);
+        if (userId && userId !== 'guest' && supabaseClient) {
+            this.getCurrentUser().then(user => {
+                this.scheduleCloudPush(userId, user?.email);
                 this.broadcastSyncEvent({
                     event: 'item-deleted',
                     id: rawId,
                     uuid: uuid,
                     userId: userId
                 });
-            } catch(e) {}
-        }
+            }).catch(() => {});
 
-        if (userId && supabaseClient) {
-            try {
-                const { error } = await supabaseClient
-                    .from('user_watchlist')
-                    .delete()
-                    .eq('user_id', userId)
-                    .eq('content_item_id', uuid);
-                return { error };
-            } catch (e) {
-                return { error: e };
+            if (!isCloudOffline()) {
+                Promise.resolve(
+                    supabaseClient
+                        .from('user_watchlist')
+                        .delete()
+                        .eq('user_id', userId)
+                        .eq('content_item_id', uuid)
+                ).catch(() => {});
             }
         }
         return { error: null };
@@ -741,57 +863,47 @@ const db = {
         }
         this.saveLocalLibrary(localLib);
 
-        // Immediate cloud store push for authenticated users
-        try {
-            const user = await this.getCurrentUser();
-            if (user) {
-                await this.pushLocalToCloud(user.id, user.email);
-                this.broadcastSyncEvent({
-                    event: 'item-added',
-                    item: itemToSave,
-                    userId: user.id
-                });
-            }
-        } catch (e) {}
+        // Non-blocking cloud store push & relational table sync for authenticated users
+        if (supabaseClient) {
+            this.getCurrentUser().then(user => {
+                if (user) {
+                    this.scheduleCloudPush(user.id, user.email);
+                    this.broadcastSyncEvent({
+                        event: 'item-added',
+                        item: itemToSave,
+                        userId: user.id
+                    });
 
-        if (!supabaseClient) {
-            return { data: [itemToSave], error: null };
+                    if (!isCloudOffline()) {
+                        const supabasePayload = {
+                            id: uuid,
+                            title: itemToSave.title,
+                            type: itemToSave.type || 'series_season',
+                            release_year: itemToSave.release_year ? parseInt(itemToSave.release_year) : null,
+                            poster_url: itemToSave.poster_url || null,
+                            streaming_service_id: null,
+                            franchise_id: null
+                        };
+                        Promise.resolve(
+                            supabaseClient
+                                .from('content_items')
+                                .upsert(supabasePayload, { onConflict: 'id' })
+                        ).then(({ error }) => {
+                            if (error) console.warn("Supabase insert warning, preserved in local storage:", error);
+                        }).catch(e => console.warn("Database insert error, preserved in local storage:", e));
+                    }
+                }
+            }).catch(() => {});
         }
-        
-        try {
-            const user = await this.getCurrentUser();
-            if (!user) {
-                return { data: [itemToSave], error: null };
-            }
 
-            const supabasePayload = {
-                id: uuid,
-                title: itemToSave.title,
-                type: itemToSave.type || 'series_season',
-                release_year: itemToSave.release_year ? parseInt(itemToSave.release_year) : null,
-                poster_url: itemToSave.poster_url || null,
-                streaming_service_id: null,
-                franchise_id: null
-            };
-
-            const { data, error } = await supabaseClient
-                .from('content_items')
-                .upsert(supabasePayload, { onConflict: 'id' })
-                .select();
-                
-            if (error) {
-                console.warn("Supabase insert warning, preserved in local storage:", error);
-                return { data: [itemToSave], error: null };
-            }
-            return { data: data || [itemToSave], error: null };
-        } catch (e) {
-            console.warn("Database insert error, preserved in local storage:", e);
-            return { data: [itemToSave], error: null };
-        }
+        return { data: [itemToSave], error: null };
     },
 
     async pushLocalToCloud(userId, email = null) {
-        if (!userId || !supabaseClient) return false;
+        if (!userId || !supabaseClient || isCloudOffline()) return false;
+        _cloudDataCache = null;
+        _cloudDataCacheTs = 0;
+
         try {
             if (!email) {
                 try {
@@ -800,6 +912,7 @@ const db = {
                 } catch(e) {}
             }
 
+            const nowIso = new Date().toISOString();
             const localLib = this.getLocalLibrary();
             const localWatch = this.getLocalWatchlist();
             const deletedRecords = this.getLocalDeletedItems();
@@ -811,63 +924,53 @@ const db = {
             const jsonDel = JSON.stringify(deletedRecords);
             const jsonTaste = localTaste ? JSON.stringify(localTaste) : null;
 
-            // 1. Primary persistence: PostgreSQL system_settings record by userId
-            await this.setSystemSetting(`user_library_${userId}`, jsonLib);
-            await this.setSystemSetting(`user_watchlist_${userId}`, jsonWatch);
-            await this.setSystemSetting(`user_deleted_${userId}`, jsonDel);
+            // 1. Batched persistence into PostgreSQL system_settings (userId + emailKey in 1 request)
+            const settingsBatch = [
+                { id: `user_library_${userId}`, value: jsonLib, updated_at: nowIso },
+                { id: `user_watchlist_${userId}`, value: jsonWatch, updated_at: nowIso },
+                { id: `user_deleted_${userId}`, value: jsonDel, updated_at: nowIso }
+            ];
             if (jsonTaste) {
-                await this.setSystemSetting(`user_taste_${userId}`, jsonTaste);
+                settingsBatch.push({ id: `user_taste_${userId}`, value: jsonTaste, updated_at: nowIso });
             }
 
-            // 2. Secondary persistence: PostgreSQL system_settings record by deterministic email hash
             if (email) {
                 const emailKey = toDeterministicUuid('email:' + String(email).toLowerCase().trim());
-                await this.setSystemSetting(`user_library_${emailKey}`, jsonLib);
-                await this.setSystemSetting(`user_watchlist_${emailKey}`, jsonWatch);
-                await this.setSystemSetting(`user_deleted_${emailKey}`, jsonDel);
+                settingsBatch.push(
+                    { id: `user_library_${emailKey}`, value: jsonLib, updated_at: nowIso },
+                    { id: `user_watchlist_${emailKey}`, value: jsonWatch, updated_at: nowIso },
+                    { id: `user_deleted_${emailKey}`, value: jsonDel, updated_at: nowIso }
+                );
                 if (jsonTaste) {
-                    await this.setSystemSetting(`user_taste_${emailKey}`, jsonTaste);
+                    settingsBatch.push({ id: `user_taste_${emailKey}`, value: jsonTaste, updated_at: nowIso });
                 }
             }
 
-            // 3. Backup update to Supabase Auth user_metadata
-            try {
-                await supabaseClient.auth.updateUser({
-                    data: {
-                        tv_library: localLib,
-                        tv_watchlist: localWatch,
-                        tv_deleted: deletedRecords.slice(-100),
-                        tv_taste_quiz: localTaste,
-                        last_synced_at: new Date().toISOString()
-                    }
-                });
-            } catch (authErr) {
-                // Secondary auth metadata non-blocking
-            }
+            await supabaseClient.from('system_settings').upsert(settingsBatch, { onConflict: 'id' });
 
-            // 4. Background attempt to populate relational tables
+            // 2. Batched relational table sync (replaces per-item sequential loops)
             try {
-                for (const item of localLib) {
-                    const uuid = toDeterministicUuid(item.id);
-                    await supabaseClient.from('content_items').upsert({
-                        id: uuid,
+                if (localLib.length > 0) {
+                    const contentRows = localLib.map(item => ({
+                        id: toDeterministicUuid(item.id),
                         title: item.title,
                         type: item.type || 'series_season',
                         release_year: item.release_year ? parseInt(item.release_year) : null,
                         poster_url: item.poster_url || null,
                         streaming_service_id: null,
                         franchise_id: null
-                    }, { onConflict: 'id' });
+                    }));
+                    await supabaseClient.from('content_items').upsert(contentRows, { onConflict: 'id' });
                 }
-                for (const w of localWatch) {
-                    const uuid = toDeterministicUuid(w.content_item_id);
-                    await supabaseClient.from('user_watchlist').upsert({
+                if (localWatch.length > 0) {
+                    const watchRows = localWatch.map(w => ({
                         user_id: userId,
-                        content_item_id: uuid,
+                        content_item_id: toDeterministicUuid(w.content_item_id),
                         status: w.status,
                         rating: w.rating,
-                        updated_at: w.updated_at || new Date().toISOString()
-                    }, { onConflict: 'user_id,content_item_id' });
+                        updated_at: w.updated_at || nowIso
+                    }));
+                    await supabaseClient.from('user_watchlist').upsert(watchRows, { onConflict: 'user_id,content_item_id' });
                 }
             } catch (tblErr) {}
 
@@ -880,7 +983,7 @@ const db = {
 
     // Strict Read-Only Fetching by default: Fetching must NEVER push to cloud as a side-effect
     async syncCloudUserData(userId, email = null, allowPush = false) {
-        if (!userId || !supabaseClient) return null;
+        if (!userId || !supabaseClient || isCloudOffline()) return null;
         try {
             if (!email) {
                 try {
@@ -990,7 +1093,13 @@ const db = {
     },
 
     async getSystemSetting(key) {
-        if (!supabaseClient) return null;
+        if (key === 'tmdb_api_key') {
+            try {
+                const localKey = localStorage.getItem('tmdb_api_key');
+                if (localKey) return localKey;
+            } catch (e) {}
+        }
+        if (!supabaseClient || isCloudOffline()) return null;
         try {
             const { data, error } = await supabaseClient
                 .from('system_settings')
@@ -1000,12 +1109,19 @@ const db = {
             if (error && error.code !== 'PGRST116') {
                 console.error("Error fetching setting:", error);
             }
-            return data?.value || null;
+            const val = data?.value || null;
+            if (key === 'tmdb_api_key' && val) {
+                try { localStorage.setItem('tmdb_api_key', val); } catch (e) {}
+            }
+            return val;
         } catch(e) { return null; }
     },
 
     async setSystemSetting(key, value) {
-        if (!supabaseClient) return { error: new Error('Supabase client not initialized') };
+        if (key === 'tmdb_api_key' && value) {
+            try { localStorage.setItem('tmdb_api_key', value); } catch (e) {}
+        }
+        if (!supabaseClient || isCloudOffline()) return { error: new Error('Supabase client not initialized or offline') };
         
         const { data, error } = await supabaseClient
             .from('system_settings')
