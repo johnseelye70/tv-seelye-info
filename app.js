@@ -804,6 +804,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 allContent = await window.db.getContentItems();
                 await loadUserData();
                 showToast('Library updated from another device.', 'info');
+            } else if (payload.event === 'rec-dismissed') {
+                if (payload.item && window.db?.addNotInterestedItem) {
+                    window.db.addNotInterestedItem(payload.item.id, payload.item.uuid, payload.item.tmdb_id, payload.item.title, false);
+                }
+                if (currentView === 'recommendations') renderSmartRecommendationsView();
+            } else if (payload.event === 'rec-dismissed-cleared') {
+                if (window.db?.clearNotInterestedItems) {
+                    window.db.clearNotInterestedItems(false);
+                }
+                if (currentView === 'recommendations') renderSmartRecommendationsView();
             }
         });
 
@@ -3128,16 +3138,18 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Filter out shows already in allContent
+        // Filter out shows already in allContent or marked "Not Interested"
         const existingIds = new Set(allContent.map(c => String(c.id)));
         const existingTmdbIds = new Set(allContent.map(c => String(c.tmdb_id)).filter(Boolean));
         const existingTitles = new Set(allContent.map(c => (c.title || '').toLowerCase().trim()));
+        const notInterestedSet = window.db?.getLocalNotInterestedIds ? window.db.getLocalNotInterestedIds() : new Set();
 
         const candidates = catalogItems.filter(item => {
             const uuid = window.db?.toDeterministicUuid ? window.db.toDeterministicUuid(String(item.id)) : String(item.id);
             if (existingIds.has(String(item.id)) || existingIds.has(uuid)) return false;
             if (existingTmdbIds.has(String(item.id))) return false;
             if (existingTitles.has((item.title || '').toLowerCase().trim())) return false;
+            if (window.db?.isNotInterested && window.db.isNotInterested(item, notInterestedSet)) return false;
             return true;
         });
 
@@ -3327,43 +3339,69 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Generate recommendations
         const recList = generateSmartRecommendationsList(profile);
+        const dismissedList = window.db?.getLocalNotInterestedItems ? window.db.getLocalNotInterestedItems() : [];
+        const dismissedBadgeHtml = dismissedList.length > 0
+            ? `<button type="button" id="restore-dismissed-recs-btn" class="restore-dismissed-recs-btn" title="Restore all shows marked Not Interested">🚫 ${dismissedList.length} Hidden • Restore</button>`
+            : '';
 
         if (recList.length === 0) {
             smartRecsContent.innerHTML = `
                 <div style="text-align: center; padding: 40px 20px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px dashed var(--border-subtle);">
                     <h3 style="margin-bottom: 8px;">You're All Caught Up!</h3>
-                    <p style="color: var(--text-muted);">You've added all top catalog shows to your library. Search TMDB in "+ Add Shows" to discover even more titles.</p>
+                    <p style="color: var(--text-muted); margin-bottom: ${dismissedList.length > 0 ? '14px' : '0'};">You've reviewed all top catalog shows. Search TMDB in "+ Add Shows" to discover even more titles.</p>
+                    ${dismissedBadgeHtml}
                 </div>
             `;
+            document.getElementById('restore-dismissed-recs-btn')?.addEventListener('click', () => {
+                if (confirm(`Restore all ${dismissedList.length} show${dismissedList.length === 1 ? '' : 's'} you marked "Not Interested"?`)) {
+                    window.db?.clearNotInterestedItems?.(true);
+                    showToast('Restored hidden recommendations.', 'info');
+                    renderSmartRecommendationsView();
+                }
+            });
             return;
         }
 
         let headerNote = '';
         if (profile.totalCount < 2 && !tasteQuizAnswers) {
             headerNote = `
-                <div style="margin-bottom: 20px; padding: 14px 18px; background: rgba(0, 195, 255, 0.08); border: 1px solid rgba(0, 195, 255, 0.25); border-radius: 10px;">
-                    <p style="font-size: 0.95rem; color: var(--text-main); margin: 0;">
-                        💡 <strong>Welcome to Smart Recommendations!</strong> Take the 30-second quiz above or start adding shows to your library to calibrate these picks. Here are acclaimed starter gateway classics across popular genres:
+                <div style="margin-bottom: 20px; padding: 14px 18px; background: rgba(0, 195, 255, 0.08); border: 1px solid rgba(0, 195, 255, 0.25); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <p style="font-size: 0.95rem; color: var(--text-main); margin: 0; flex: 1; min-width: 240px;">
+                        💡 <strong>Welcome to Smart Recommendations!</strong> Take the 30-second quiz above or start adding shows to your library to calibrate these picks.
                     </p>
+                    ${dismissedBadgeHtml}
                 </div>
             `;
         } else if (tasteQuizAnswers) {
             headerNote = `
                 <div style="margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                     <h3 style="font-size: 1.25rem; color: var(--text-main); margin: 0;">🎯 Top Personalized Picks (Quiz Calibrated)</h3>
-                    <span style="font-size: 0.82rem; color: var(--text-muted);">Dynamically boosted by your 30s taste quiz preferences</span>
+                    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <span style="font-size: 0.82rem; color: var(--text-muted);">Dynamically boosted by your 30s taste quiz preferences</span>
+                        ${dismissedBadgeHtml}
+                    </div>
                 </div>
             `;
         } else {
             headerNote = `
                 <div style="margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                     <h3 style="font-size: 1.25rem; color: var(--text-main); margin: 0;">🎯 Top Personalized Picks for You</h3>
-                    <span style="font-size: 0.82rem; color: var(--text-muted);">Ranked by genre synergy, viewing status & acclaim</span>
+                    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <span style="font-size: 0.82rem; color: var(--text-muted);">Ranked by genre synergy, viewing status & acclaim</span>
+                        ${dismissedBadgeHtml}
+                    </div>
                 </div>
             `;
         }
 
         smartRecsContent.innerHTML = headerNote + `<div class="tmdb-results" id="smart-recs-grid"></div>`;
+        document.getElementById('restore-dismissed-recs-btn')?.addEventListener('click', () => {
+            if (confirm(`Restore all ${dismissedList.length} show${dismissedList.length === 1 ? '' : 's'} you marked "Not Interested"?`)) {
+                window.db?.clearNotInterestedItems?.(true);
+                showToast('Restored hidden recommendations.', 'info');
+                renderSmartRecommendationsView();
+            }
+        });
         const grid = document.getElementById('smart-recs-grid');
         if (grid) {
             recList.forEach(item => {
@@ -3413,9 +3451,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="card-service-badge" style="position: static; font-size: 0.7rem; padding: 2px 6px;">${serviceName}</span>
                 </div>
                 ${overview ? `<div class="tmdb-overview">${overview}</div>` : ''}
-                <button class="btn primary-btn add-smart-rec-btn" style="margin-top: auto; width: 100%; font-size: 0.85rem;" data-tmdb-id="${item.id}" data-title="${cleanTitle}">
-                    ${isAlreadyInLib ? '✓ In Library' : '+ Add to Library'}
-                </button>
+                <div class="rec-card-actions">
+                    <button type="button" class="btn primary-btn add-smart-rec-btn" style="width: 100%; font-size: 0.85rem;" data-tmdb-id="${item.id}" data-title="${cleanTitle}">
+                        ${isAlreadyInLib ? '✓ In Library' : '+ Add to Library'}
+                    </button>
+                    ${!isAlreadyInLib ? `
+                        <button type="button" class="btn not-interested-rec-btn" data-tmdb-id="${item.id}" data-title="${cleanTitle}" title="Never recommend this show again">
+                            🚫 Not Interested
+                        </button>
+                    ` : ''}
+                </div>
             </div>
         `;
 
@@ -3504,6 +3549,22 @@ document.addEventListener('DOMContentLoaded', () => {
             addBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 handleAdd(addBtn);
+            });
+        }
+
+        const notInterestedBtn = card.querySelector('.not-interested-rec-btn');
+        if (notInterestedBtn) {
+            notInterestedBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (card.classList.contains('dismissing')) return;
+                card.classList.add('dismissing');
+                if (window.db?.addNotInterestedItem) {
+                    window.db.addNotInterestedItem(item, uuid, tmdbId, item.title);
+                }
+                showToast(`Hidden "${item.title}" — won't be recommended again.`, 'info');
+                setTimeout(() => {
+                    renderSmartRecommendationsView();
+                }, 180);
             });
         }
 

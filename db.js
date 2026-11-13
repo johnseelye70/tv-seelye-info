@@ -343,6 +343,134 @@ const db = {
         } catch (e) {}
     },
 
+    // Recommendation "Not Interested" Dismissal Ledger (Multi-Device Sync)
+    getLocalNotInterestedItems() {
+        try {
+            const raw = localStorage.getItem('tv_hub_not_interested');
+            const arr = raw ? JSON.parse(raw) : [];
+            return Array.isArray(arr) ? arr : [];
+        } catch (e) { return []; }
+    },
+
+    getLocalNotInterestedIds(sourceItems = null) {
+        try {
+            const items = sourceItems || this.getLocalNotInterestedItems();
+            const set = new Set();
+            items.forEach(d => {
+                if (d) {
+                    if (d.id) set.add(String(d.id));
+                    if (d.uuid) set.add(String(d.uuid));
+                    if (d.tmdb_id) set.add(String(d.tmdb_id));
+                    if (d.key) set.add(String(d.key));
+                }
+            });
+            return set;
+        } catch (e) { return new Set(); }
+    },
+
+    saveLocalNotInterestedItems(items) {
+        try {
+            const valid = Array.isArray(items) ? items : [];
+            localStorage.setItem('tv_hub_not_interested', JSON.stringify(valid));
+        } catch (e) {}
+    },
+
+    isNotInterested(itemOrId, notInterestedSet = null) {
+        const set = notInterestedSet || this.getLocalNotInterestedIds();
+        if (!itemOrId || set.size === 0) return false;
+        if (typeof itemOrId === 'string' || typeof itemOrId === 'number') {
+            const s = String(itemOrId);
+            if (set.has(s)) return true;
+            if (set.has(toDeterministicUuid(s))) return true;
+            return false;
+        }
+        if (itemOrId.id && (set.has(String(itemOrId.id)) || set.has(toDeterministicUuid(itemOrId.id)))) return true;
+        if (itemOrId.tmdb_id && (set.has(String(itemOrId.tmdb_id)) || set.has(toDeterministicUuid(itemOrId.tmdb_id)))) return true;
+        if (itemOrId.title && set.has('title:' + String(itemOrId.title).toLowerCase().trim())) return true;
+        return false;
+    },
+
+    addNotInterestedItem(itemOrId, uuid = null, tmdbId = null, title = null, syncCloud = true) {
+        const list = this.getLocalNotInterestedItems();
+        const isObj = typeof itemOrId === 'object' && itemOrId !== null;
+        const rawId = isObj ? String(itemOrId.id || itemOrId.tmdb_id || '') : String(itemOrId || '');
+        const targetUuid = uuid || (isObj ? itemOrId.uuid : null) || (rawId ? toDeterministicUuid(rawId) : null);
+        const targetTmdb = tmdbId || (isObj ? itemOrId.tmdb_id : null) || (rawId && !isNaN(Number(rawId)) ? rawId : null);
+        const targetTitle = title || (isObj ? (itemOrId.title || itemOrId.name) : null);
+        const titleKey = targetTitle ? 'title:' + String(targetTitle).toLowerCase().trim() : null;
+
+        const entry = {
+            id: rawId || String(targetUuid || ''),
+            uuid: targetUuid ? String(targetUuid) : null,
+            tmdb_id: targetTmdb ? String(targetTmdb) : null,
+            title: targetTitle || null,
+            key: titleKey,
+            dismissed_at: new Date().toISOString()
+        };
+
+        const filtered = list.filter(d => {
+            if (!d) return false;
+            if (entry.id && String(d.id) === entry.id) return false;
+            if (entry.uuid && String(d.uuid) === entry.uuid) return false;
+            if (entry.tmdb_id && String(d.tmdb_id) === entry.tmdb_id) return false;
+            if (entry.key && String(d.key) === entry.key) return false;
+            return true;
+        });
+        filtered.push(entry);
+
+        const trimmed = filtered.slice(-500);
+        this.saveLocalNotInterestedItems(trimmed);
+
+        if (syncCloud && supabaseClient) {
+            this.getCurrentUser().then(user => {
+                if (user) {
+                    this.scheduleCloudPush(user.id, user.email);
+                    this.broadcastSyncEvent({
+                        event: 'rec-dismissed',
+                        item: entry,
+                        userId: user.id
+                    });
+                }
+            }).catch(() => {});
+        }
+        return trimmed;
+    },
+
+    removeNotInterestedItem(itemOrId) {
+        if (!itemOrId) return;
+        const isObj = typeof itemOrId === 'object' && itemOrId !== null;
+        const rawId = isObj ? String(itemOrId.id || '') : String(itemOrId || '');
+        const targetUuid = (isObj && itemOrId.uuid) ? String(itemOrId.uuid) : (rawId ? toDeterministicUuid(rawId) : null);
+        const targetTmdb = (isObj && itemOrId.tmdb_id) ? String(itemOrId.tmdb_id) : (rawId && !isNaN(Number(rawId)) ? rawId : null);
+        const targetTitle = isObj ? (itemOrId.title || itemOrId.name) : null;
+        const titleKey = targetTitle ? 'title:' + String(targetTitle).toLowerCase().trim() : null;
+
+        const filtered = this.getLocalNotInterestedItems().filter(d => {
+            if (!d) return false;
+            if (rawId && (String(d.id) === rawId || String(d.tmdb_id) === rawId)) return false;
+            if (targetUuid && (String(d.uuid) === targetUuid || String(d.id) === targetUuid)) return false;
+            if (targetTmdb && (String(d.tmdb_id) === targetTmdb || String(d.id) === targetTmdb)) return false;
+            if (titleKey && String(d.key) === titleKey) return false;
+            return true;
+        });
+        this.saveLocalNotInterestedItems(filtered);
+    },
+
+    clearNotInterestedItems(syncCloud = true) {
+        this.saveLocalNotInterestedItems([]);
+        if (syncCloud && supabaseClient) {
+            this.getCurrentUser().then(user => {
+                if (user) {
+                    this.scheduleCloudPush(user.id, user.email);
+                    this.broadcastSyncEvent({
+                        event: 'rec-dismissed-cleared',
+                        userId: user.id
+                    });
+                }
+            }).catch(() => {});
+        }
+    },
+
     // Non-destructive merging helpers with tombstone exclusion
     mergeLibrarySafely(localList, cloudList) {
         const deletedSet = this.getLocalDeletedIds();
@@ -436,7 +564,7 @@ const db = {
     },
 
     async fetchUserCloudData(userId, email = null, forceRefresh = false) {
-        const emptyResult = { library: [], watchlist: [], taste: null, deleted: [], hasCloudRecord: false };
+        const emptyResult = { library: [], watchlist: [], taste: null, deleted: [], notInterested: [], hasCloudRecord: false };
         if ((!userId && !email) || !supabaseClient || isCloudOffline()) return emptyResult;
 
         const cacheKey = `${userId || ''}:${email || ''}`;
@@ -454,6 +582,7 @@ const db = {
             let cloudWatch = null;
             let cloudTaste = null;
             let cloudDeleted = [];
+            let cloudNotInterested = [];
             let cloudLibFound = false;
             let cloudWatchFound = false;
 
@@ -465,7 +594,8 @@ const db = {
                     `user_deleted_${userId}`,
                     `user_library_${userId}`,
                     `user_watchlist_${userId}`,
-                    `user_taste_${userId}`
+                    `user_taste_${userId}`,
+                    `user_not_interested_${userId}`
                 );
             }
             if (emailKey) {
@@ -473,7 +603,8 @@ const db = {
                     `user_deleted_${emailKey}`,
                     `user_library_${emailKey}`,
                     `user_watchlist_${emailKey}`,
-                    `user_taste_${emailKey}`
+                    `user_taste_${emailKey}`,
+                    `user_not_interested_${emailKey}`
                 );
             }
 
@@ -523,6 +654,13 @@ const db = {
                                     if (parsed) cloudTaste = parsed;
                                 } catch (e) {}
                             }
+                            const niVal = rowMap.get(`user_not_interested_${prefixId}`);
+                            if (niVal && (!onlyIfMissing || cloudNotInterested.length === 0)) {
+                                try {
+                                    const parsed = JSON.parse(niVal);
+                                    if (Array.isArray(parsed)) cloudNotInterested = parsed;
+                                } catch (e) {}
+                            }
                         };
 
                         // 1. Primary lookup by userId
@@ -565,6 +703,7 @@ const db = {
                 watchlist: cloudWatch || [],
                 taste: cloudTaste,
                 deleted: cloudDeleted,
+                notInterested: cloudNotInterested,
                 hasCloudRecord: cloudLibFound
             };
             _cloudDataCache = result;
@@ -841,10 +980,16 @@ const db = {
         const uuid = toDeterministicUuid(itemData.id);
         const rawId = String(itemData.id);
 
-        // Remove from tombstone ledger since user is actively re-adding or adding this show
+        // Remove from tombstone and not-interested ledgers since user is actively adding this show
         this.removeDeletedItem(rawId);
         this.removeDeletedItem(uuid);
-        if (itemData.tmdb_id) this.removeDeletedItem(String(itemData.tmdb_id));
+        this.removeNotInterestedItem(itemData);
+        this.removeNotInterestedItem(rawId);
+        this.removeNotInterestedItem(uuid);
+        if (itemData.tmdb_id) {
+            this.removeDeletedItem(String(itemData.tmdb_id));
+            this.removeNotInterestedItem(String(itemData.tmdb_id));
+        }
 
         const itemToSave = {
             ...itemData,
@@ -916,19 +1061,22 @@ const db = {
             const localLib = this.getLocalLibrary();
             const localWatch = this.getLocalWatchlist();
             const deletedRecords = this.getLocalDeletedItems();
+            const notInterestedRecords = this.getLocalNotInterestedItems();
             let localTaste = null;
             try { localTaste = JSON.parse(localStorage.getItem('tv_taste_quiz_answers') || 'null'); } catch(e) {}
 
             const jsonLib = JSON.stringify(localLib);
             const jsonWatch = JSON.stringify(localWatch);
             const jsonDel = JSON.stringify(deletedRecords);
+            const jsonNotInterested = JSON.stringify(notInterestedRecords);
             const jsonTaste = localTaste ? JSON.stringify(localTaste) : null;
 
             // 1. Batched persistence into PostgreSQL system_settings (userId + emailKey in 1 request)
             const settingsBatch = [
                 { id: `user_library_${userId}`, value: jsonLib, updated_at: nowIso },
                 { id: `user_watchlist_${userId}`, value: jsonWatch, updated_at: nowIso },
-                { id: `user_deleted_${userId}`, value: jsonDel, updated_at: nowIso }
+                { id: `user_deleted_${userId}`, value: jsonDel, updated_at: nowIso },
+                { id: `user_not_interested_${userId}`, value: jsonNotInterested, updated_at: nowIso }
             ];
             if (jsonTaste) {
                 settingsBatch.push({ id: `user_taste_${userId}`, value: jsonTaste, updated_at: nowIso });
@@ -939,7 +1087,8 @@ const db = {
                 settingsBatch.push(
                     { id: `user_library_${emailKey}`, value: jsonLib, updated_at: nowIso },
                     { id: `user_watchlist_${emailKey}`, value: jsonWatch, updated_at: nowIso },
-                    { id: `user_deleted_${emailKey}`, value: jsonDel, updated_at: nowIso }
+                    { id: `user_deleted_${emailKey}`, value: jsonDel, updated_at: nowIso },
+                    { id: `user_not_interested_${emailKey}`, value: jsonNotInterested, updated_at: nowIso }
                 );
                 if (jsonTaste) {
                     settingsBatch.push({ id: `user_taste_${emailKey}`, value: jsonTaste, updated_at: nowIso });
@@ -994,12 +1143,17 @@ const db = {
 
             // 1. Fetch user data from PostgreSQL system_settings
             const cloudData = await this.fetchUserCloudData(userId, email);
-            const { library: cloudLib, watchlist: cloudWatch, taste: cloudTaste, deleted: cloudDel, hasCloudRecord } = cloudData;
+            const { library: cloudLib, watchlist: cloudWatch, taste: cloudTaste, deleted: cloudDel, notInterested: cloudNotInterested, hasCloudRecord } = cloudData;
 
-            // 2. Merge cloud deleted tombstones into local tombstone ledger
+            // 2. Merge cloud deleted tombstones and dismissed recommendations into local ledgers
             if (Array.isArray(cloudDel) && cloudDel.length > 0) {
                 cloudDel.forEach(d => {
                     if (d) this.addDeletedItem(d.id, d.uuid, d.tmdb_id, d.title);
+                });
+            }
+            if (Array.isArray(cloudNotInterested) && cloudNotInterested.length > 0) {
+                cloudNotInterested.forEach(d => {
+                    if (d) this.addNotInterestedItem(d.id, d.uuid, d.tmdb_id, d.title, false);
                 });
             }
 
